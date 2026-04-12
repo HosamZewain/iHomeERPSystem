@@ -1,0 +1,249 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\QuotationStatus;
+use App\Enums\SalesChannel;
+use App\Enums\SalesInvoiceStatus;
+use App\Livewire\Quotations\QuotationForm;
+use App\Livewire\Quotations\QuotationShow;
+use App\Models\Customer;
+use App\Models\Product;
+use App\Models\Quotation;
+use App\Models\QuotationItem;
+use App\Models\SalesInvoice;
+use App\Models\StockMovement;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+class QuotationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_quotation_form_calculates_item_and_invoice_discounts_without_stock_movement(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::factory()->create();
+        $product = Product::factory()->create([
+            'sale_price' => 1000,
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(QuotationForm::class)
+            ->set('quotation_number', 'QUO-TEST-001')
+            ->set('customer_id', (string) $customer->id)
+            ->set('quotation_date', '2026-04-12')
+            ->set('invoice_discount_type', Quotation::DISCOUNT_PERCENTAGE)
+            ->set('invoice_discount_value', '10')
+            ->set('installation_enabled', true)
+            ->set('installation_pricing_mode', Quotation::INSTALLATION_PERCENTAGE)
+            ->set('installation_percentage_value', '15')
+            ->set('items.0.product_id', (string) $product->id)
+            ->set('items.0.quantity', '2')
+            ->set('items.0.unit_sale_price', '1000')
+            ->set('items.0.item_discount_type', Quotation::DISCOUNT_FIXED)
+            ->set('items.0.item_discount_value', '100')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $quotation = Quotation::query()->with('items')->firstOrFail();
+        $item = $quotation->items->first();
+
+        $this->assertEquals(1900.0, (float) $quotation->subtotal);
+        $this->assertEquals(190.0, (float) $quotation->invoice_discount_amount);
+        $this->assertEquals(285.0, (float) $quotation->installation_total);
+        $this->assertEquals(1995.0, (float) $quotation->total);
+        $this->assertEquals(100.0, (float) $item->item_discount_amount);
+        $this->assertEquals(1900.0, (float) $item->line_total);
+        $this->assertSame(0, StockMovement::query()->count());
+    }
+
+    public function test_quotation_pages_render_for_authorized_users(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $product = Product::factory()->create(['name' => 'Smart Sensor', 'is_active' => true]);
+        $quotation = Quotation::factory()->create([
+            'quotation_number' => 'QUO-TEST-002',
+            'subtotal' => 900,
+            'invoice_discount_type' => Quotation::DISCOUNT_FIXED,
+            'invoice_discount_value' => 50,
+            'invoice_discount_amount' => 50,
+            'total' => 850,
+            'created_by' => $user->id,
+        ]);
+
+        QuotationItem::factory()->create([
+            'quotation_id' => $quotation->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_sale_price' => 900,
+            'item_discount_type' => Quotation::DISCOUNT_FIXED,
+            'item_discount_value' => 0,
+            'item_discount_amount' => 0,
+            'line_total' => 900,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('quotations.index'))
+            ->assertOk()
+            ->assertSee('QUO-TEST-002')
+            ->assertSee('عروض الأسعار');
+
+        $this->actingAs($user)
+            ->get(route('quotations.show', $quotation))
+            ->assertOk()
+            ->assertSee('Smart Sensor')
+            ->assertSee('طباعة / حفظ PDF')
+            ->assertSee('عرض السعر لا يؤثر على المخزون');
+
+        $this->actingAs($user)
+            ->get(route('quotations.edit', $quotation))
+            ->assertOk()
+            ->assertSee('تعديل عرض سعر')
+            ->assertSee('Smart Sensor');
+
+        $this->actingAs($user)
+            ->get(route('quotations.print', $quotation))
+            ->assertOk()
+            ->assertSee('عرض سعر')
+            ->assertSee('QUO-TEST-002')
+            ->assertSee('Smart Sensor')
+            ->assertSee('طباعة / حفظ PDF')
+            ->assertSee('هذا العرض لا يؤثر على المخزون');
+    }
+
+    public function test_quotation_form_filters_customer_and_product_dropdowns(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        Customer::factory()->create(['name' => 'Alpha Customer', 'phone' => '01011111111']);
+        Customer::factory()->create(['name' => 'Beta Customer', 'phone' => '01022222222']);
+        Product::factory()->create([
+            'name' => 'Alpha Sensor',
+            'internal_sku' => 'ALPHA-SENSOR',
+            'is_active' => true,
+        ]);
+        Product::factory()->create([
+            'name' => 'Beta Switch',
+            'internal_sku' => 'BETA-SWITCH',
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(QuotationForm::class)
+            ->set('customerSearch', 'Alpha')
+            ->set('productSearch.0', 'ALPHA')
+            ->assertSee('Alpha Customer')
+            ->assertDontSee('Beta Customer')
+            ->assertSee('Alpha Sensor')
+            ->assertDontSee('Beta Switch');
+    }
+
+    public function test_quotation_conversion_creates_draft_sales_invoice_without_stock_movement(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::factory()->create();
+        $product = Product::factory()->create([
+            'name' => 'Smart Thermostat',
+            'current_average_cost' => 400,
+            'sale_price' => 900,
+        ]);
+
+        $quotation = Quotation::factory()->create([
+            'quotation_number' => 'QUO-TEST-003',
+            'customer_id' => $customer->id,
+            'subtotal' => 1700,
+            'invoice_discount_type' => Quotation::DISCOUNT_PERCENTAGE,
+            'invoice_discount_value' => 10,
+            'invoice_discount_amount' => 170,
+            'installation_enabled' => true,
+            'installation_pricing_mode' => Quotation::INSTALLATION_FIXED,
+            'installation_fixed_amount' => 300,
+            'installation_total' => 300,
+            'installation_notes' => 'Installation included.',
+            'total' => 1830,
+            'notes' => 'Customer approved package.',
+            'created_by' => $user->id,
+        ]);
+
+        QuotationItem::factory()->create([
+            'quotation_id' => $quotation->id,
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'unit_sale_price' => 900,
+            'item_discount_type' => Quotation::DISCOUNT_FIXED,
+            'item_discount_value' => 100,
+            'item_discount_amount' => 100,
+            'line_total' => 1700,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(QuotationShow::class, ['quotation' => $quotation])
+            ->call('convertToInvoice')
+            ->assertHasNoErrors();
+
+        $quotation->refresh();
+        $invoice = SalesInvoice::query()->with('items')->firstOrFail();
+        $invoiceItem = $invoice->items->first();
+
+        $this->assertSame(QuotationStatus::Converted, $quotation->status);
+        $this->assertSame(SalesInvoiceStatus::Draft, $invoice->status);
+        $this->assertSame(SalesChannel::Direct, $invoice->sales_channel);
+        $this->assertSame($quotation->id, $invoice->quotation_id);
+        $this->assertSame($customer->id, $invoice->customer_id);
+        $this->assertEquals(1700.0, (float) $invoice->subtotal);
+        $this->assertSame(Quotation::DISCOUNT_PERCENTAGE, $invoice->invoice_discount_type);
+        $this->assertEquals(10.0, (float) $invoice->invoice_discount_value);
+        $this->assertEquals(170.0, (float) $invoice->invoice_discount_amount);
+        $this->assertTrue($invoice->installation_enabled);
+        $this->assertEquals(300.0, (float) $invoice->installation_total);
+        $this->assertEquals(300.0, (float) $invoice->installation_profit);
+        $this->assertSame('Installation included.', $invoice->installation_notes);
+        $this->assertEquals(1830.0, (float) $invoice->gross_total);
+        $this->assertEquals(1830.0, (float) $invoice->net_revenue_after_partner_commission);
+        $this->assertSame($product->id, $invoiceItem->product_id);
+        $this->assertEquals(2.0, (float) $invoiceItem->quantity);
+        $this->assertEquals(900.0, (float) $invoiceItem->unit_sale_price);
+        $this->assertSame(Quotation::DISCOUNT_FIXED, $invoiceItem->item_discount_type);
+        $this->assertEquals(100.0, (float) $invoiceItem->item_discount_value);
+        $this->assertEquals(100.0, (float) $invoiceItem->item_discount_amount);
+        $this->assertEquals(1700.0, (float) $invoiceItem->line_total);
+        $this->assertEquals(0.0, (float) $invoiceItem->cost_at_sale_time);
+        $this->assertEquals(0.0, (float) $invoice->total_cost);
+        $this->assertSame(0, StockMovement::query()->where('source_type', StockMovement::SOURCE_SALES_ITEM)->count());
+    }
+
+    public function test_quotation_conversion_cannot_run_twice(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $product = Product::factory()->create();
+        $quotation = Quotation::factory()->create([
+            'quotation_number' => 'QUO-TEST-004',
+            'subtotal' => 500,
+            'total' => 500,
+            'created_by' => $user->id,
+        ]);
+
+        QuotationItem::factory()->create([
+            'quotation_id' => $quotation->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_sale_price' => 500,
+            'line_total' => 500,
+        ]);
+
+        $quotation->convertToSalesInvoice($user);
+
+        try {
+            $quotation->convertToSalesInvoice($user);
+            $this->fail('Expected duplicate conversion validation exception.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('لا يمكن تحويل عرض السعر', collect($exception->errors())->flatten()->first());
+        }
+
+        $this->assertSame(1, SalesInvoice::query()->count());
+    }
+}

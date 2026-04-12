@@ -1,0 +1,61 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ihome-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=ihome
+      - DB_USERNAME=ihome
+      - DB_PASSWORD=secret
+    networks:
+      - ihome
+
+  mysql:
+    image: mysql:8.0
+    container_name: ihome-mysql
+    restart: unless-stopped
+    ports:
+      - "3310:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootsecret
+      MYSQL_DATABASE: ihome
+      MYSQL_USER: ihome
+      MYSQL_PASSWORD: secret
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ihome
+
+  node:
+    image: node:22-alpine
+    container_name: ihome-node
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+    command: sh -c "npm install && npm run build"
+    networks:
+      - ihome
+
+volumes:
+  mysql_data:
+
+networks:
+  ihome:
+    driver: bridge

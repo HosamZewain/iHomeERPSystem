@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#1e40af">
+    <title>iHome - غير متصل</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Cairo, Tahoma, Arial, sans-serif;
+            background: #f9fafb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+            color: #111827;
+            text-align: center;
+        }
+        .container {
+            max-width: 28rem;
+            width: 100%;
+        }
+        .logo {
+            color: #1e40af;
+            font-size: 2.25rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+        p { color: #4b5563; line-height: 1.8; margin-bottom: 1.5rem; }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            min-height: 44px;
+            cursor: pointer;
+        }
+        button:hover { background: #1d4ed8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">iHome</div>
+        <h1>الاتصال غير متاح حالياً</h1>
+        <p>يمكن فتح واجهة التطبيق الأساسية، لكن بيانات العملاء والمنتجات والفواتير تحتاج إلى اتصال بالإنترنت.</p>
+        <button onclick="window.location.reload()">إعادة المحاولة</button>
+    </div>
+</body>
+</html>
