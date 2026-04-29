@@ -405,6 +405,12 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
   - Sales return movement linked to invoice item through `source_type = stock_return`.
   - Legacy import stock adjustment.
 - Stock summary and product movement history are implemented.
+- Stock summary now supports controlled stock adjustment from the stock page for authorized users with `products.manage`:
+  - user enters the target stock quantity
+  - system calculates delta automatically
+  - system records `adjustment_in` or `adjustment_out`
+  - adjustment reason is required
+  - this is still movement-based stock control, not silent direct quantity editing
 - Stock report is implemented with search, filters, sorting, valuation by average cost and sale price, low stock count, zero/negative stock counts.
 - Direct uncontrolled stock editing is not allowed.
 - Stock adjustments/returns are represented in constants but there is no full operational adjustment/returns UI yet.
@@ -562,6 +568,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - RTL is the default layout direction.
 - EGP is the default currency; use `App\Support\Money::format()` for monetary display.
 - Stock is movement-based and must not be directly edited in uncontrolled ways.
+- Stock can be corrected from the stock summary page only through a recorded adjustment movement with a required reason and authorized permission.
 - Purchase invoice confirmation increases stock and updates product average cost.
 - Sales invoice confirmation decreases stock and creates stock movements.
 - Draft purchase/sales invoices do not affect stock.
@@ -725,6 +732,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Do not re-scaffold auth, layouts, or completed modules.
 - Do not redesign unrelated modules while implementing a targeted change.
 - Do not mutate stock directly; use stock movements or a safe dedicated workflow.
+- If the user asks to “edit stock”, implement it as a stock adjustment workflow that creates `StockMovement` records; do not write silent stock quantities onto products.
 - Do not treat installation as a product.
 - Do not apply invoice-level discount to installation.
 - Do not treat partner commission as a customer discount.

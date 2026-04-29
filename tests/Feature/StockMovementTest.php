@@ -8,6 +8,7 @@ use App\Models\PurchaseInvoiceItem;
 use App\Models\StockMovement;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class StockMovementTest extends TestCase
@@ -74,5 +75,53 @@ class StockMovementTest extends TestCase
             ->assertOk()
             ->assertSee('حركات المنتج')
             ->assertSee('شراء');
+    }
+
+    public function test_authorized_user_can_adjust_stock_from_stock_page(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $product = Product::factory()->create([
+            'name' => 'Adjustable Switch',
+            'current_average_cost' => 75,
+        ]);
+
+        StockMovement::factory()->create([
+            'product_id' => $product->id,
+            'quantity' => 4,
+            'balance_after' => 4,
+            'unit_cost' => 75,
+            'total_cost' => 300,
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(\App\Livewire\Stock\StockSummary::class)
+            ->call('startAdjustment', $product->id)
+            ->set('adjustmentTargetQuantity', '10')
+            ->set('adjustmentNotes', 'جرد فعلي')
+            ->call('saveAdjustment')
+            ->assertHasNoErrors();
+
+        $movement = StockMovement::query()->latest('id')->firstOrFail();
+
+        $this->assertSame(StockMovement::TYPE_ADJUSTMENT_IN, $movement->movement_type);
+        $this->assertSame(StockMovement::SOURCE_ADJUSTMENT, $movement->source_type);
+        $this->assertSame($product->id, $movement->source_id);
+        $this->assertEquals(6.0, (float) $movement->quantity);
+        $this->assertEquals(10.0, (float) $movement->balance_after);
+        $this->assertSame($user->id, $movement->created_by);
+        $this->assertStringContainsString('جرد فعلي', $movement->notes);
+        $this->assertEquals(10.0, Product::find($product->id)->current_stock_quantity);
+    }
+
+    public function test_user_without_products_manage_permission_cannot_adjust_stock(): void
+    {
+        $user = User::factory()->create(['role' => 'sales']);
+        $product = Product::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(\App\Livewire\Stock\StockSummary::class)
+            ->call('startAdjustment', $product->id)
+            ->assertForbidden();
     }
 }

@@ -4,6 +4,9 @@ namespace App\Livewire\Stock;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\StockMovement;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -20,6 +23,14 @@ class StockSummary extends Component
     public string $sortField = 'name';
 
     public string $sortDirection = 'asc';
+
+    public bool $showAdjustmentForm = false;
+
+    public ?int $adjustmentProductId = null;
+
+    public string $adjustmentTargetQuantity = '';
+
+    public string $adjustmentNotes = '';
 
     public function updatingSearch(): void
     {
@@ -62,6 +73,93 @@ class StockSummary extends Component
         $this->resetPage();
     }
 
+    public function startAdjustment(int $productId): void
+    {
+        abort_unless(auth()->user()->hasPermission('products.manage'), 403);
+
+        $product = Product::query()->findOrFail($productId);
+
+        $this->showAdjustmentForm = true;
+        $this->adjustmentProductId = $product->id;
+        $this->adjustmentTargetQuantity = number_format($product->current_stock_quantity, 2, '.', '');
+        $this->adjustmentNotes = '';
+        $this->resetValidation(['adjustmentTargetQuantity', 'adjustmentNotes']);
+    }
+
+    public function cancelAdjustment(): void
+    {
+        $this->showAdjustmentForm = false;
+        $this->adjustmentProductId = null;
+        $this->adjustmentTargetQuantity = '';
+        $this->adjustmentNotes = '';
+        $this->resetValidation(['adjustmentTargetQuantity', 'adjustmentNotes']);
+    }
+
+    public function saveAdjustment(): void
+    {
+        abort_unless(auth()->user()->hasPermission('products.manage'), 403);
+
+        $data = $this->validate([
+            'adjustmentProductId' => ['required', 'integer', 'exists:products,id'],
+            'adjustmentTargetQuantity' => ['required', 'numeric', 'min:-999999999.99', 'max:999999999.99'],
+            'adjustmentNotes' => ['required', 'string', 'max:2000'],
+        ], [], [
+            'adjustmentProductId' => 'المنتج',
+            'adjustmentTargetQuantity' => 'الرصيد المستهدف',
+            'adjustmentNotes' => 'سبب التسوية',
+        ]);
+
+        try {
+            DB::transaction(function () use ($data) {
+                $product = Product::query()
+                    ->whereKey($data['adjustmentProductId'])
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                StockMovement::query()
+                    ->where('product_id', $product->id)
+                    ->lockForUpdate()
+                    ->get();
+
+                $currentQuantity = round((float) $product->current_stock_quantity, 2);
+                $targetQuantity = round((float) $data['adjustmentTargetQuantity'], 2);
+                $delta = round($targetQuantity - $currentQuantity, 2);
+
+                if (abs($delta) < 0.01) {
+                    throw ValidationException::withMessages([
+                        'adjustmentTargetQuantity' => 'الرصيد المستهدف يساوي الرصيد الحالي، ولا توجد تسوية مطلوبة.',
+                    ]);
+                }
+
+                $movementType = $delta > 0
+                    ? StockMovement::TYPE_ADJUSTMENT_IN
+                    : StockMovement::TYPE_ADJUSTMENT_OUT;
+
+                $unitCost = round((float) $product->current_average_cost, 2);
+
+                StockMovement::create([
+                    'product_id' => $product->id,
+                    'movement_type' => $movementType,
+                    'source_type' => StockMovement::SOURCE_ADJUSTMENT,
+                    'source_id' => $product->id,
+                    'created_by' => auth()->id(),
+                    'quantity' => $delta,
+                    'balance_after' => $targetQuantity,
+                    'unit_cost' => $unitCost,
+                    'total_cost' => round(abs($delta) * max($unitCost, 0), 2),
+                    'movement_date' => now()->toDateString(),
+                    'notes' => 'تسوية مخزون من شاشة المخزون: ' . $data['adjustmentNotes'],
+                ]);
+            });
+
+            session()->flash('success', 'تم تسجيل تسوية المخزون وتحديث الرصيد الحالي.');
+            $this->cancelAdjustment();
+            $this->resetPage();
+        } catch (ValidationException $exception) {
+            throw $exception;
+        }
+    }
+
     public function render()
     {
         $stockSql = $this->stockQuantitySql();
@@ -100,6 +198,8 @@ class StockSummary extends Component
             'categories' => Category::query()->orderBy('name')->get(),
             'summary' => $summary,
             'sortableFields' => $this->sortableFields(),
+            'adjustmentProduct' => $this->adjustmentProductId ? Product::query()->find($this->adjustmentProductId) : null,
+            'canAdjustStock' => auth()->user()->hasPermission('products.manage'),
         ])->layout('layouts.app', ['header' => 'ملخص المخزون']);
     }
 

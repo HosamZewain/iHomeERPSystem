@@ -1,4 +1,49 @@
 <div>
+    @if (session('success'))
+        <x-alert type="success" :message="session('success')" />
+    @endif
+    @if (session('error'))
+        <x-alert type="error" :message="session('error')" />
+    @endif
+
+    @if($showAdjustmentForm && $adjustmentProduct)
+        <div class="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm sm:p-5">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-amber-900">تسوية رصيد المخزون</h3>
+                    <p class="mt-1 text-sm text-amber-800">
+                        المنتج: {{ $adjustmentProduct->name }} ({{ $adjustmentProduct->internal_sku }})
+                    </p>
+                    <p class="mt-1 text-xs text-amber-700">
+                        الرصيد الحالي: {{ number_format($adjustmentProduct->current_stock_quantity, 2) }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <x-input label="الرصيد المستهدف" wire:model="adjustmentTargetQuantity" type="number" step="0.01" :error="$errors->first('adjustmentTargetQuantity')" />
+            </div>
+
+            <div class="mt-4">
+                <label class="mb-1 block text-sm font-medium text-gray-700">سبب التسوية</label>
+                <textarea wire:model="adjustmentNotes" rows="3"
+                          class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+                @if($errors->has('adjustmentNotes'))
+                    <p class="mt-1 text-xs text-red-600">{{ $errors->first('adjustmentNotes') }}</p>
+                @endif
+            </div>
+
+            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <x-button wire:click="saveAdjustment" type="button" class="w-full sm:w-auto">
+                    حفظ التسوية
+                </x-button>
+                <x-button wire:click="cancelAdjustment" type="button" variant="secondary" class="w-full sm:w-auto">
+                    إلغاء
+                </x-button>
+            </div>
+        </div>
+    @endif
+
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <x-stat-card label="عدد المنتجات" value="{{ number_format($summary['products_count']) }}" icon="cube" color="blue" />
         <x-stat-card label="إجمالي الكميات" value="{{ number_format($summary['total_quantity'], 2) }}" icon="archive" color="primary" />
@@ -100,6 +145,11 @@
                         <td class="px-6 py-4 text-right space-x-2 space-x-reverse">
                             <a href="{{ route('products.show', $product) }}" wire:navigate class="text-gray-600 hover:text-gray-800 text-sm font-medium">المنتج</a>
                             <a href="{{ route('stock.movements.product', $product) }}" wire:navigate class="text-primary-600 hover:text-primary-800 text-sm font-medium">الحركات</a>
+                            @if($canAdjustStock)
+                                <button wire:click="startAdjustment({{ $product->id }})" type="button" class="text-amber-700 hover:text-amber-900 text-sm font-medium">
+                                    تسوية
+                                </button>
+                            @endif
                         </td>
                     </tr>
                 @empty
@@ -155,6 +205,11 @@
                 <div class="mt-3 flex flex-wrap items-center gap-4 border-t border-gray-100 pt-3">
                     <a href="{{ route('products.show', $product) }}" wire:navigate class="text-gray-600 hover:text-gray-800 text-sm font-medium py-1">المنتج</a>
                     <a href="{{ route('stock.movements.product', $product) }}" wire:navigate class="text-primary-600 hover:text-primary-800 text-sm font-medium py-1">حركات المخزون</a>
+                    @if($canAdjustStock)
+                        <button wire:click="startAdjustment({{ $product->id }})" type="button" class="text-amber-700 hover:text-amber-900 text-sm font-medium py-1">
+                            تسوية المخزون
+                        </button>
+                    @endif
                 </div>
             </div>
         @empty
