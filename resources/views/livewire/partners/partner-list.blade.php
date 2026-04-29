@@ -129,7 +129,7 @@
                 @forelse($partners as $partner)
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4">
-                            <div class="text-sm font-medium text-gray-900">{{ $partner->name }}</div>
+                            <a href="{{ route('partners.show', $partner) }}" wire:navigate class="text-sm font-medium text-primary-600 hover:text-primary-800">{{ $partner->name }}</a>
                             <div class="text-sm text-gray-500">{{ $partner->phone }}</div>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-700">{{ $partner->type->label() }}</td>
@@ -148,6 +148,7 @@
                             @endif
                         </td>
                         <td class="px-6 py-4 text-right space-x-2 space-x-reverse">
+                            <a href="{{ route('partners.show', $partner) }}" wire:navigate class="text-primary-600 hover:text-primary-800 text-sm font-medium">عرض</a>
                             <button wire:click="edit({{ $partner->id }})" class="text-primary-600 hover:text-primary-800 text-sm font-medium">تعديل</button>
                             <button wire:click="toggleActive({{ $partner->id }})"
                                     wire:confirm="هل تريد {{ $partner->is_active ? 'إيقاف' : 'تفعيل' }} هذا الشريك؟"
@@ -176,7 +177,7 @@
             <div class="bg-white rounded-xl border border-gray-200 p-4">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                        <div class="text-sm font-medium text-gray-900 truncate">{{ $partner->name }}</div>
+                        <a href="{{ route('partners.show', $partner) }}" wire:navigate class="text-sm font-medium text-primary-600 hover:text-primary-800 truncate block">{{ $partner->name }}</a>
                         <div class="text-xs text-gray-500 truncate">{{ $partner->type->label() }} - {{ $partner->phone }}</div>
                         <div class="text-xs text-gray-500 truncate">
                             العمولة:
@@ -196,6 +197,7 @@
                     </div>
                 </div>
                 <div class="mt-3 flex flex-wrap items-center gap-4 border-t border-gray-100 pt-3">
+                    <a href="{{ route('partners.show', $partner) }}" wire:navigate class="text-primary-600 hover:text-primary-800 text-sm font-medium py-1">عرض</a>
                     <button wire:click="edit({{ $partner->id }})" class="text-primary-600 hover:text-primary-800 text-sm font-medium py-1">تعديل</button>
                     <button wire:click="toggleActive({{ $partner->id }})"
                             wire:confirm="هل تريد {{ $partner->is_active ? 'إيقاف' : 'تفعيل' }} هذا الشريك؟"

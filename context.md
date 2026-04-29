@@ -352,21 +352,27 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Status: implemented.
 - Livewire CRUD: `App\Livewire\Suppliers\SupplierList`.
 - Used by purchase invoices and optionally products.
+- Dedicated detail page: `App\Livewire\Suppliers\SupplierShow`.
+- Supplier detail page shows supplier info, purchase invoice history, aggregate purchase totals/quantities, related products, and top purchased products from that supplier.
 
 ### Customers
 
 - Status: implemented.
 - Livewire CRUD: `App\Livewire\Customers\CustomerList`.
+- Dedicated detail page: `App\Livewire\Customers\CustomerShow`.
 - Sales invoices allow nullable customer for cash-customer behavior; quotations require a customer.
 - Quotations and sales invoices support inline customer creation from the same form screen; the new customer is auto-selected after save.
 - Customer list supports search, contact filters, sorting, mobile cards, and visible `created_at` / `updated_at` columns with sorting.
+- Customer detail page shows customer info, sales invoice history, invoice/payment summary stats, and aggregated confirmed products received by the customer.
 
 ### Partners
 
 - Status: implemented.
 - Livewire CRUD: `App\Livewire\Partners\PartnerList`.
+- Dedicated detail page: `App\Livewire\Partners\PartnerShow`.
 - Partner fields include type, phone/contact data, default commission type/value, notes, active/inactive status.
 - Partner commission is separate from customer discount and must remain separate.
+- Partner detail page shows partner sales invoices, confirmed sales/collection summary, commission totals, invoice-level commission history, and top customers linked to that partner.
 
 ### Products
 
@@ -464,6 +470,11 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
   - invoice stores `paid_amount`, `remaining_amount`, and optional `due_date`.
   - payments are allowed on confirmed invoices only.
   - payments do not affect stock, quotation conversion, installation logic, or partner commission formulas.
+- Sales invoice list now supports constrained bulk actions on the currently visible page:
+  - bulk sync payment summary recalculates `paid_amount`, `remaining_amount`, and `payment_status` from recorded payments/refunds without creating new records.
+  - bulk mark as paid creates one balancing payment record per selected confirmed invoice for its full remaining amount; it does not directly flip `payment_status`.
+  - bulk invoice status changes are limited to safe existing transitions only: confirm selected drafts or cancel selected drafts.
+  - destructive/financial bulk actions require typed confirmation (`تنفيذ`) in the UI.
 - Payment receipt printing is implemented per payment record.
 - List supports search, filters, sorting, mobile cards, desktop table, visible payment status, and visible `created_at` / `updated_at` columns with sorting.
 - Sales invoice form has searchable customer/product selection integrated into the same selector UI.
@@ -688,7 +699,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Arabic-first UI and RTL layouts.
 - EGP money formatting helper.
 - Dashboard.
-- Categories, suppliers, customers, partners CRUD.
+- Categories, suppliers, customers, partners CRUD plus read-only detail pages with summary stats and linked invoice/product/commission data.
 - Products CRUD with images and stock visibility.
 - Purchase invoices with confirmation stock increase and average cost update.
 - Movement-based stock model, summary, movement history, and stock report.
@@ -707,7 +718,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 ### Partial / Future-Friendly
 
 - Partner settlement template type exists in `PrintTemplate`, but partner settlement print is not fully template-driven.
-- Stock adjustment movement types exist, but there is still no dedicated general stock adjustment UI.
+- Stock adjustment UI exists from the stock summary page and writes `adjustment_in` / `adjustment_out` movements, but there is not yet an approval or dual-control layer around those manual adjustments.
 - Sales invoice return currently supports full-invoice reversal only; partial line-item returns/credit-note style flows are not implemented.
 - Installation provider tracking is simple fields only; no separate technician/employee/company provider module exists.
 - Payment data is report-ready, but there is not yet a dedicated collections/receivables report screen.
@@ -719,7 +730,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Partial sales return workflow.
 - Supplier return workflow.
 - Supplier-side or standalone return document workflow.
-- Dedicated stock adjustment UI with approval/audit controls.
+- Stock adjustment approval/audit controls beyond the current direct adjustment UI.
 - Advanced PDF generation engine; current print flow is browser print.
 - Full multilingual language switcher; Arabic is primary and English can be added later.
 - Advanced offline/PWA transaction sync.

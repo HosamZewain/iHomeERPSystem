@@ -7,6 +7,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\SalesChannel;
 use App\Enums\SalesInvoiceStatus;
 use App\Livewire\SalesInvoices\SalesInvoiceCreate;
+use App\Livewire\SalesInvoices\SalesInvoiceList;
 use App\Livewire\SalesInvoices\SalesInvoiceShow;
 use App\Models\Customer;
 use App\Models\Partner;
@@ -745,6 +746,151 @@ class SalesInvoiceTest extends TestCase
         $this->assertEquals(0.0, (float) $invoice->remaining_amount);
         $this->assertSame(2, SalesInvoicePayment::query()->count());
         $this->assertSame(0, StockMovement::query()->where('source_type', StockMovement::SOURCE_SALES_ITEM)->count());
+    }
+
+    public function test_sales_invoice_list_can_bulk_mark_selected_confirmed_invoices_as_paid(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::factory()->create();
+
+        $firstInvoice = SalesInvoice::factory()->create([
+            'customer_id' => $customer->id,
+            'invoice_number' => 'INV-BULK-PAID-001',
+            'gross_total' => 500,
+            'net_revenue_after_partner_commission' => 500,
+            'status' => SalesInvoiceStatus::Confirmed->value,
+            'paid_amount' => 0,
+            'remaining_amount' => 500,
+            'created_by' => $user->id,
+        ]);
+
+        $secondInvoice = SalesInvoice::factory()->create([
+            'customer_id' => $customer->id,
+            'invoice_number' => 'INV-BULK-PAID-002',
+            'gross_total' => 750,
+            'net_revenue_after_partner_commission' => 750,
+            'status' => SalesInvoiceStatus::Confirmed->value,
+            'paid_amount' => 0,
+            'remaining_amount' => 750,
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SalesInvoiceList::class)
+            ->set('selectedInvoices', [(string) $firstInvoice->id, (string) $secondInvoice->id])
+            ->set('bulkAction', 'mark_as_paid')
+            ->set('bulkPaymentDate', '2026-04-29')
+            ->set('bulkPaymentMethod', PaymentMethod::Cash->value)
+            ->set('bulkConfirmation', 'تنفيذ')
+            ->call('performBulkAction')
+            ->assertHasNoErrors();
+
+        $firstInvoice->refresh();
+        $secondInvoice->refresh();
+
+        $this->assertSame(InvoicePaymentStatus::Paid, $firstInvoice->payment_status);
+        $this->assertSame(InvoicePaymentStatus::Paid, $secondInvoice->payment_status);
+        $this->assertEquals(500.0, (float) $firstInvoice->paid_amount);
+        $this->assertEquals(750.0, (float) $secondInvoice->paid_amount);
+        $this->assertEquals(0.0, (float) $firstInvoice->remaining_amount);
+        $this->assertEquals(0.0, (float) $secondInvoice->remaining_amount);
+        $this->assertSame(2, SalesInvoicePayment::query()->count());
+    }
+
+    public function test_sales_invoice_list_can_bulk_sync_stale_payment_summaries(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::factory()->create();
+        $invoice = SalesInvoice::factory()->create([
+            'customer_id' => $customer->id,
+            'invoice_number' => 'INV-BULK-SYNC-001',
+            'gross_total' => 900,
+            'net_revenue_after_partner_commission' => 900,
+            'status' => SalesInvoiceStatus::Confirmed->value,
+            'payment_status' => InvoicePaymentStatus::Paid->value,
+            'paid_amount' => 900,
+            'remaining_amount' => 0,
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SalesInvoiceList::class)
+            ->set('selectedInvoices', [(string) $invoice->id])
+            ->set('bulkAction', 'sync_payment_summary')
+            ->call('performBulkAction')
+            ->assertHasNoErrors();
+
+        $invoice->refresh();
+
+        $this->assertSame(InvoicePaymentStatus::Unpaid, $invoice->payment_status);
+        $this->assertEquals(0.0, (float) $invoice->paid_amount);
+        $this->assertEquals(900.0, (float) $invoice->remaining_amount);
+        $this->assertSame(0, SalesInvoicePayment::query()->count());
+    }
+
+    public function test_sales_invoice_list_bulk_invoice_actions_use_safe_model_transitions(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $product = Product::factory()->create([
+            'current_average_cost' => 100,
+            'sale_price' => 200,
+        ]);
+
+        StockMovement::factory()->create([
+            'product_id' => $product->id,
+            'quantity' => 10,
+            'balance_after' => 10,
+            'unit_cost' => 100,
+            'total_cost' => 1000,
+            'created_by' => $user->id,
+        ]);
+
+        $draftToConfirm = SalesInvoice::factory()->create([
+            'invoice_number' => 'INV-BULK-CONFIRM-001',
+            'subtotal' => 400,
+            'gross_total' => 400,
+            'net_revenue_after_partner_commission' => 400,
+            'status' => SalesInvoiceStatus::Draft->value,
+            'remaining_amount' => 400,
+            'created_by' => $user->id,
+        ]);
+
+        SalesInvoiceItem::factory()->create([
+            'sales_invoice_id' => $draftToConfirm->id,
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'unit_sale_price' => 200,
+            'line_total' => 400,
+            'sort_order' => 1,
+        ]);
+
+        $draftToCancel = SalesInvoice::factory()->create([
+            'invoice_number' => 'INV-BULK-CANCEL-001',
+            'status' => SalesInvoiceStatus::Draft->value,
+            'gross_total' => 300,
+            'net_revenue_after_partner_commission' => 300,
+            'remaining_amount' => 300,
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SalesInvoiceList::class)
+            ->set('selectedInvoices', [(string) $draftToConfirm->id])
+            ->set('bulkAction', 'confirm_drafts')
+            ->set('bulkConfirmation', 'تنفيذ')
+            ->call('performBulkAction')
+            ->assertHasNoErrors();
+
+        Livewire::actingAs($user)
+            ->test(SalesInvoiceList::class)
+            ->set('selectedInvoices', [(string) $draftToCancel->id])
+            ->set('bulkAction', 'cancel_drafts')
+            ->set('bulkConfirmation', 'تنفيذ')
+            ->call('performBulkAction')
+            ->assertHasNoErrors();
+
+        $this->assertSame(SalesInvoiceStatus::Confirmed, $draftToConfirm->refresh()->status);
+        $this->assertSame(SalesInvoiceStatus::Cancelled, $draftToCancel->refresh()->status);
     }
 
     public function test_sales_invoice_payment_blocks_overpayment_and_draft_collection(): void

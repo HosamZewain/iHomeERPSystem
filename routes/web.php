@@ -4,8 +4,10 @@ use App\Enums\SalesChannel;
 use App\Livewire\Auth\Login;
 use App\Livewire\Categories\CategoryList;
 use App\Livewire\Customers\CustomerList;
+use App\Livewire\Customers\CustomerShow;
 use App\Livewire\Dashboard;
 use App\Livewire\Partners\PartnerList;
+use App\Livewire\Partners\PartnerShow;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
 use App\Livewire\PurchaseInvoices\PurchaseInvoiceCreate;
@@ -25,6 +27,7 @@ use App\Livewire\Settings\DatabaseBackups\DatabaseBackupList;
 use App\Livewire\Stock\ProductMovementHistory;
 use App\Livewire\Stock\StockSummary;
 use App\Livewire\Suppliers\SupplierList;
+use App\Livewire\Suppliers\SupplierShow;
 use App\Livewire\Users\RoleList;
 use App\Livewire\Users\UserCreate;
 use App\Livewire\Users\UserEdit;
@@ -66,6 +69,7 @@ Route::middleware(['auth', 'active'])->group(function () {
 
     Route::middleware('permission:suppliers.manage')->group(function () {
         Route::get('/suppliers', SupplierList::class)->name('suppliers.index');
+        Route::get('/suppliers/{supplier}', SupplierShow::class)->name('suppliers.show');
     });
 
     Route::middleware('permission:purchases.manage')->group(function () {
@@ -189,10 +193,12 @@ Route::middleware(['auth', 'active'])->group(function () {
 
     Route::middleware('permission:customers.create')->group(function () {
         Route::get('/customers', CustomerList::class)->name('customers.index');
+        Route::get('/customers/{customer}', CustomerShow::class)->name('customers.show');
     });
 
     Route::middleware('permission:partners.manage')->group(function () {
         Route::get('/partners', PartnerList::class)->name('partners.index');
+        Route::get('/partners/{partner}', PartnerShow::class)->name('partners.show');
     });
 
     Route::middleware('permission:reports.view')->group(function () {

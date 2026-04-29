@@ -112,7 +112,7 @@
                 @forelse($customers as $customer)
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4">
-                            <div class="text-sm font-medium text-gray-900">{{ $customer->name }}</div>
+                            <a href="{{ route('customers.show', $customer) }}" wire:navigate class="text-sm font-medium text-primary-600 hover:text-primary-800">{{ $customer->name }}</a>
                             <div class="text-sm text-gray-500">{{ $customer->email ?: 'لا يوجد بريد' }}</div>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-700">{{ $customer->phone }}</td>
@@ -120,6 +120,7 @@
                         <td class="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{{ $customer->created_at->format('Y-m-d H:i') }}</td>
                         <td class="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{{ $customer->updated_at->format('Y-m-d H:i') }}</td>
                         <td class="px-6 py-4 text-right space-x-2 space-x-reverse">
+                            <a href="{{ route('customers.show', $customer) }}" wire:navigate class="text-primary-600 hover:text-primary-800 text-sm font-medium">عرض</a>
                             <button wire:click="edit({{ $customer->id }})" class="text-primary-600 hover:text-primary-800 text-sm font-medium">تعديل</button>
                             <button wire:click="delete({{ $customer->id }})"
                                     wire:confirm="هل تريد حذف هذا العميل؟"
@@ -143,7 +144,7 @@
             <div class="bg-white rounded-xl border border-gray-200 p-4">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                        <div class="text-sm font-medium text-gray-900 truncate">{{ $customer->name }}</div>
+                        <a href="{{ route('customers.show', $customer) }}" wire:navigate class="text-sm font-medium text-primary-600 hover:text-primary-800 truncate block">{{ $customer->name }}</a>
                         <div class="text-xs text-gray-500 truncate">{{ $customer->phone }}</div>
                         @if($customer->email)
                             <div class="text-xs text-gray-500 truncate">{{ $customer->email }}</div>
@@ -153,6 +154,7 @@
                     </div>
                 </div>
                 <div class="mt-3 flex items-center gap-4 border-t border-gray-100 pt-3">
+                    <a href="{{ route('customers.show', $customer) }}" wire:navigate class="text-primary-600 hover:text-primary-800 text-sm font-medium py-1">عرض</a>
                     <button wire:click="edit({{ $customer->id }})" class="text-primary-600 hover:text-primary-800 text-sm font-medium py-1">تعديل</button>
                     <button wire:click="delete({{ $customer->id }})"
                             wire:confirm="هل تريد حذف هذا العميل؟"

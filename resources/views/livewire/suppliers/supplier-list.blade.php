@@ -83,12 +83,13 @@
                 @forelse($suppliers as $supplier)
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4">
-                            <div class="text-sm font-medium text-gray-900">{{ $supplier->name }}</div>
+                            <a href="{{ route('suppliers.show', $supplier) }}" wire:navigate class="text-sm font-medium text-primary-600 hover:text-primary-800">{{ $supplier->name }}</a>
                             <div class="text-sm text-gray-500">{{ $supplier->email ?: 'لا يوجد بريد' }}</div>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-700">{{ $supplier->contact_person ?: '-' }}</td>
                         <td class="px-6 py-4 text-sm text-gray-700">{{ $supplier->phone }}</td>
                         <td class="px-6 py-4 text-right space-x-2 space-x-reverse">
+                            <a href="{{ route('suppliers.show', $supplier) }}" wire:navigate class="text-primary-600 hover:text-primary-800 text-sm font-medium">عرض</a>
                             <button wire:click="edit({{ $supplier->id }})" class="text-primary-600 hover:text-primary-800 text-sm font-medium">تعديل</button>
                             <button wire:click="delete({{ $supplier->id }})"
                                     wire:confirm="هل تريد حذف هذا المورد؟"
@@ -112,7 +113,7 @@
             <div class="bg-white rounded-xl border border-gray-200 p-4">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                        <div class="text-sm font-medium text-gray-900 truncate">{{ $supplier->name }}</div>
+                        <a href="{{ route('suppliers.show', $supplier) }}" wire:navigate class="text-sm font-medium text-primary-600 hover:text-primary-800 truncate block">{{ $supplier->name }}</a>
                         <div class="text-xs text-gray-500 truncate">{{ $supplier->phone }}</div>
                         @if($supplier->contact_person)
                             <div class="text-xs text-gray-500 truncate">{{ $supplier->contact_person }}</div>
@@ -120,6 +121,7 @@
                     </div>
                 </div>
                 <div class="mt-3 flex items-center gap-4 border-t border-gray-100 pt-3">
+                    <a href="{{ route('suppliers.show', $supplier) }}" wire:navigate class="text-primary-600 hover:text-primary-800 text-sm font-medium py-1">عرض</a>
                     <button wire:click="edit({{ $supplier->id }})" class="text-primary-600 hover:text-primary-800 text-sm font-medium py-1">تعديل</button>
                     <button wire:click="delete({{ $supplier->id }})"
                             wire:confirm="هل تريد حذف هذا المورد؟"
