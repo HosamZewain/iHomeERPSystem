@@ -45,11 +45,15 @@ class ListingTimestampsTest extends TestCase
         $this->actingAs($user)
             ->get(route('sales-invoices.index'))
             ->assertOk()
+            ->assertSee('حالة السداد')
             ->assertSee('تاريخ الإنشاء')
             ->assertSee('آخر تحديث');
 
         Livewire::actingAs($user)
             ->test(SalesInvoiceList::class)
+            ->set('sortField', 'payment_status')
+            ->set('sortDirection', 'asc')
+            ->assertSee('غير مدفوع')
             ->set('sortField', 'created_at')
             ->set('sortDirection', 'asc')
             ->assertSeeInOrder(['INV-TIME-OLD', 'INV-TIME-NEW'])

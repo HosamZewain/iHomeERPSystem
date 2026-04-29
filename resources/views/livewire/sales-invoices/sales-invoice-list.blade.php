@@ -87,6 +87,7 @@
                     <x-sortable-th field="customer" :sort-field="$sortField" :sort-direction="$sortDirection">العميل</x-sortable-th>
                     <x-sortable-th field="channel" :sort-field="$sortField" :sort-direction="$sortDirection">القناة</x-sortable-th>
                     <x-sortable-th field="status" :sort-field="$sortField" :sort-direction="$sortDirection">الحالة</x-sortable-th>
+                    <x-sortable-th field="payment_status" :sort-field="$sortField" :sort-direction="$sortDirection">حالة السداد</x-sortable-th>
                     <x-sortable-th field="items_count" :sort-field="$sortField" :sort-direction="$sortDirection">البنود</x-sortable-th>
                     <x-sortable-th field="gross_total" :sort-field="$sortField" :sort-direction="$sortDirection">إجمالي العميل</x-sortable-th>
                     <x-sortable-th field="created_at" :sort-field="$sortField" :sort-direction="$sortDirection">تاريخ الإنشاء</x-sortable-th>
@@ -111,6 +112,9 @@
                         <td class="px-6 py-4">
                             <x-badge :color="$invoice->status->color()">{{ $invoice->status->label() }}</x-badge>
                         </td>
+                        <td class="px-6 py-4">
+                            <x-badge :color="$invoice->payment_status->color()">{{ $invoice->payment_status->label() }}</x-badge>
+                        </td>
                         <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ $invoice->items_count }}</td>
                         <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ \App\Support\Money::format($invoice->gross_total) }}</td>
                         <td class="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{{ $invoice->created_at->format('Y-m-d H:i') }}</td>
@@ -126,7 +130,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="px-6 py-12 text-center text-gray-400">
+                        <td colspan="10" class="px-6 py-12 text-center text-gray-400">
                             <x-icon name="receipt" class="h-10 w-10 mx-auto mb-2" />
                             <p class="text-sm">لا توجد فواتير بيع.</p>
                         </td>
@@ -144,6 +148,9 @@
                         <div class="text-sm font-medium text-gray-900 truncate">{{ $invoice->invoice_number }}</div>
                         <div class="text-xs text-gray-500 truncate">{{ $invoice->customer?->name ?: 'عميل نقدي' }}</div>
                         <div class="text-xs text-gray-500">{{ $invoice->invoice_date->format('Y-m-d') }} - {{ $invoice->items_count }} بند</div>
+                        <div class="mt-1">
+                            <x-badge :color="$invoice->payment_status->color()">{{ $invoice->payment_status->label() }}</x-badge>
+                        </div>
                     </div>
                     <x-badge :color="$invoice->status->color()">{{ $invoice->status->label() }}</x-badge>
                 </div>

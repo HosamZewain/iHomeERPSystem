@@ -465,7 +465,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
   - payments are allowed on confirmed invoices only.
   - payments do not affect stock, quotation conversion, installation logic, or partner commission formulas.
 - Payment receipt printing is implemented per payment record.
-- List supports search, filters, sorting, mobile cards, desktop table, and visible `created_at` / `updated_at` columns with sorting.
+- List supports search, filters, sorting, mobile cards, desktop table, visible payment status, and visible `created_at` / `updated_at` columns with sorting.
 - Sales invoice form has searchable customer/product selection integrated into the same selector UI.
 - Sales invoice form supports creating a new customer inline without leaving the screen; cash customer flow is still allowed by leaving the customer empty.
 - Sales invoice create/edit cards that contain searchable dropdowns use visible card overflow so customer/product result lists can expand fully.
