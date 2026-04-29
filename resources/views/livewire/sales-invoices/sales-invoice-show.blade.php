@@ -298,6 +298,10 @@
                         <p class="mt-1 text-lg font-semibold text-green-700">{{ \App\Support\Money::format($invoice->paid_amount) }}</p>
                     </div>
                     <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                        <p class="text-xs text-gray-500">إجمالي المسترد</p>
+                        <p class="mt-1 text-lg font-semibold text-amber-700">{{ \App\Support\Money::format($invoice->refunds->sum('amount')) }}</p>
+                    </div>
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
                         <p class="text-xs text-gray-500">المتبقي</p>
                         <p class="mt-1 text-lg font-semibold {{ (float) $invoice->remaining_amount > 0 ? 'text-red-700' : 'text-gray-900' }}">{{ \App\Support\Money::format($invoice->remaining_amount) }}</p>
                     </div>
@@ -341,6 +345,35 @@
                 @else
                     <div class="mt-6 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-center text-sm text-gray-500">
                         لم يتم تسجيل أي دفعات على هذه الفاتورة حتى الآن.
+                    </div>
+                @endif
+
+                @if($invoice->refunds->isNotEmpty())
+                    <div class="mt-6 border-t border-gray-200 pt-4">
+                        <h3 class="text-sm font-semibold text-gray-900">سجل الاسترداد</h3>
+                        <div class="mt-3 space-y-3">
+                            @foreach($invoice->refunds as $refund)
+                                <div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-gray-900">{{ $refund->refund_number }}</p>
+                                            <p class="text-xs text-gray-500">{{ $refund->refund_date->format('Y-m-d') }} - {{ $refund->payment_method->label() }}</p>
+                                            <p class="text-xs text-gray-500">سجله: {{ $refund->creator?->name ?: '-' }}</p>
+                                            @if($refund->reference_number)
+                                                <p class="text-xs text-gray-500">المرجع: {{ $refund->reference_number }}</p>
+                                            @endif
+                                            @if($refund->notes)
+                                                <p class="mt-2 text-sm text-gray-600 whitespace-pre-line">{{ $refund->notes }}</p>
+                                            @endif
+                                        </div>
+                                        <div class="sm:text-left">
+                                            <p class="text-lg font-semibold text-amber-800">{{ \App\Support\Money::format($refund->amount) }}</p>
+                                            <p class="text-xs text-gray-500">استرداد من مبالغ العميل</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
                     </div>
                 @endif
 
@@ -480,6 +513,12 @@
                                     هذا الإجراء سيُرجع كل الكميات إلى المخزون ويغيّر حالة الفاتورة إلى مرتجع. لا يمكن التراجع عنه من هذه الشاشة.
                                 </p>
 
+                                @if((float) $invoice->paid_amount > 0)
+                                    <div class="mt-3 rounded-lg border border-amber-300 bg-white px-4 py-3 text-amber-900">
+                                        سيتم تسجيل استرداد كامل بقيمة {{ \App\Support\Money::format($invoice->paid_amount) }} قبل إغلاق الفاتورة كمرتجع.
+                                    </div>
+                                @endif
+
                                 <div class="mt-4">
                                     <label class="mb-1 block text-sm font-medium text-gray-700">سبب المرتجع</label>
                                     <textarea wire:model="return_reason" rows="3"
@@ -492,6 +531,29 @@
                                 <div class="mt-4">
                                     <x-input label='اكتب "مرتجع" للتأكيد' wire:model="return_confirmation" type="text" :error="$errors->first('return_confirmation')" />
                                 </div>
+
+                                @if((float) $invoice->paid_amount > 0)
+                                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <x-input label="تاريخ الاسترداد" wire:model="refund_date" type="date" required :error="$errors->first('refund_date')" />
+
+                                        <x-select label="طريقة الاسترداد" wire:model="refund_method" required :error="$errors->first('refund_method')">
+                                            @foreach($refundMethods as $method => $label)
+                                                <option value="{{ $method }}">{{ $label }}</option>
+                                            @endforeach
+                                        </x-select>
+
+                                        <x-input label="مرجع الاسترداد" wire:model="refund_reference_number" type="text" :error="$errors->first('refund_reference_number')" />
+                                    </div>
+
+                                    <div class="mt-4">
+                                        <label class="mb-1 block text-sm font-medium text-gray-700">ملاحظات الاسترداد</label>
+                                        <textarea wire:model="refund_notes" rows="3"
+                                                  class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+                                        @if($errors->has('refund_notes'))
+                                            <p class="mt-1 text-xs text-red-600">{{ $errors->first('refund_notes') }}</p>
+                                        @endif
+                                    </div>
+                                @endif
 
                                 <div class="mt-4 flex flex-col sm:flex-row gap-3">
                                     <x-button wire:click="reverseConfirmed" type="button" variant="danger" class="w-full sm:w-auto">
@@ -511,7 +573,7 @@
                             </x-button>
                         @endif
                     @elseif($invoice->status->value === 'confirmed')
-                        <x-alert type="info" message="فاتورة البيع المؤكدة مقفلة. لا يمكن إلغاؤها مباشرة. يمكن تنفيذ مرتجع كامل فقط إذا لم تُسجل عليها أي دفعات." />
+                        <x-alert type="info" message="فاتورة البيع المؤكدة مقفلة. لا يمكن إلغاؤها مباشرة. استخدم تنفيذ المرتجع الكامل، وسيتم أيضًا تسجيل استرداد الدفعات إذا كانت الفاتورة مدفوعة جزئيًا أو كليًا." />
                     @elseif($invoice->status->value === 'returned')
                         <x-alert type="info" message="تم تنفيذ مرتجع كامل لهذه الفاتورة، وتمت إعادة الكميات إلى المخزون." />
                     @endif

@@ -15,6 +15,7 @@ use App\Models\Quotation;
 use App\Models\SalesInvoice;
 use App\Models\SalesInvoiceItem;
 use App\Models\SalesInvoicePayment;
+use App\Models\SalesInvoiceRefund;
 use App\Models\StockMovement;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -198,7 +199,7 @@ class SalesInvoiceTest extends TestCase
         $this->assertEquals(5.0, Product::find($product->id)->current_stock_quantity);
     }
 
-    public function test_confirmed_sales_invoice_return_is_blocked_when_payments_exist(): void
+    public function test_confirmed_sales_invoice_return_refunds_existing_payments_and_restores_stock(): void
     {
         $user = User::factory()->create(['role' => 'admin']);
         $product = Product::factory()->create([
@@ -242,15 +243,23 @@ class SalesInvoiceTest extends TestCase
             'notes' => null,
         ], $user);
 
-        try {
-            $invoice->reverseConfirmed('محاولة بعد تحصيل', $user);
-            $this->fail('Expected validation exception when returning a paid invoice.');
-        } catch (ValidationException $exception) {
-            $this->assertStringContainsString('يوجد عليها تحصيل', collect($exception->errors())->flatten()->first());
-        }
+        $invoice->reverseConfirmed('إلغاء بعد تحصيل جزئي', $user, [
+            'refund_date' => now()->toDateString(),
+            'refund_method' => PaymentMethod::Cash->value,
+            'refund_reference_number' => 'REF-100',
+            'refund_notes' => 'استرداد كامل عند المرتجع',
+        ]);
 
-        $this->assertSame(SalesInvoiceStatus::Confirmed, $invoice->refresh()->status);
-        $this->assertSame(0, StockMovement::query()->where('movement_type', StockMovement::TYPE_RETURN_IN)->count());
+        $invoice->refresh();
+        $refund = SalesInvoiceRefund::query()->firstOrFail();
+
+        $this->assertSame(SalesInvoiceStatus::Returned, $invoice->status);
+        $this->assertEquals(100.0, (float) $refund->amount);
+        $this->assertSame(PaymentMethod::Cash, $refund->payment_method);
+        $this->assertEquals(0.0, (float) $invoice->paid_amount);
+        $this->assertEquals(0.0, (float) $invoice->remaining_amount);
+        $this->assertSame(InvoicePaymentStatus::Unpaid, $invoice->payment_status);
+        $this->assertSame(1, StockMovement::query()->where('movement_type', StockMovement::TYPE_RETURN_IN)->count());
     }
 
     public function test_sales_invoice_show_self_heals_stale_payment_summary_for_old_confirmed_invoice(): void

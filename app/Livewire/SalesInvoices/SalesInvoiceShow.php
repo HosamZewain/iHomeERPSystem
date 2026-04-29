@@ -14,6 +14,10 @@ class SalesInvoiceShow extends Component
     public bool $showReturnForm = false;
     public string $return_reason = '';
     public string $return_confirmation = '';
+    public string $refund_date = '';
+    public string $refund_method = 'cash';
+    public string $refund_reference_number = '';
+    public string $refund_notes = '';
     public string $payment_date = '';
     public string $payment_amount = '';
     public string $payment_method = 'cash';
@@ -57,7 +61,11 @@ class SalesInvoiceShow extends Component
         $this->showReturnForm = true;
         $this->return_reason = '';
         $this->return_confirmation = '';
-        $this->resetValidation(['return_reason', 'return_confirmation']);
+        $this->refund_date = now()->toDateString();
+        $this->refund_method = 'cash';
+        $this->refund_reference_number = '';
+        $this->refund_notes = '';
+        $this->resetValidation(['return_reason', 'return_confirmation', 'refund_date', 'refund_method', 'refund_reference_number', 'refund_notes']);
     }
 
     public function cancelReturn(): void
@@ -65,7 +73,11 @@ class SalesInvoiceShow extends Component
         $this->showReturnForm = false;
         $this->return_reason = '';
         $this->return_confirmation = '';
-        $this->resetValidation(['return_reason', 'return_confirmation']);
+        $this->refund_date = '';
+        $this->refund_method = 'cash';
+        $this->refund_reference_number = '';
+        $this->refund_notes = '';
+        $this->resetValidation(['return_reason', 'return_confirmation', 'refund_date', 'refund_method', 'refund_reference_number', 'refund_notes']);
     }
 
     public function reverseConfirmed(): void
@@ -73,9 +85,17 @@ class SalesInvoiceShow extends Component
         $data = $this->validate([
             'return_reason' => ['required', 'string', 'max:2000'],
             'return_confirmation' => ['required', 'string'],
+            'refund_date' => ['nullable', 'date'],
+            'refund_method' => ['nullable', 'in:'.implode(',', array_keys(SalesInvoicePayment::methods()))],
+            'refund_reference_number' => ['nullable', 'string', 'max:255'],
+            'refund_notes' => ['nullable', 'string', 'max:2000'],
         ], [], [
             'return_reason' => 'سبب المرتجع',
             'return_confirmation' => 'تأكيد المرتجع',
+            'refund_date' => 'تاريخ الاسترداد',
+            'refund_method' => 'طريقة الاسترداد',
+            'refund_reference_number' => 'مرجع الاسترداد',
+            'refund_notes' => 'ملاحظات الاسترداد',
         ]);
 
         if (! in_array(trim($data['return_confirmation']), ['مرتجع', 'RETURN'], true)) {
@@ -85,7 +105,12 @@ class SalesInvoiceShow extends Component
         }
 
         try {
-            $this->invoice->reverseConfirmed(trim($data['return_reason']), auth()->user());
+            $this->invoice->reverseConfirmed(trim($data['return_reason']), auth()->user(), [
+                'refund_date' => $data['refund_date'] ?? null,
+                'refund_method' => $data['refund_method'] ?? null,
+                'refund_reference_number' => $data['refund_reference_number'] ?? null,
+                'refund_notes' => $data['refund_notes'] ?? null,
+            ]);
             session()->flash('success', 'تم تنفيذ مرتجع الفاتورة وإرجاع الكميات إلى المخزون.');
             $this->cancelReturn();
         } catch (ValidationException $exception) {
@@ -135,7 +160,7 @@ class SalesInvoiceShow extends Component
 
     private function refreshInvoice(): void
     {
-        $this->invoice->refresh()->load(['customer', 'partner', 'items.product', 'payments.creator', 'payments.receiver', 'returner']);
+        $this->invoice->refresh()->load(['customer', 'partner', 'items.product', 'payments.creator', 'payments.receiver', 'refunds.creator', 'returner']);
     }
 
     private function resetPaymentForm(): void
@@ -158,7 +183,7 @@ class SalesInvoiceShow extends Component
     {
         $this->invoice->syncPaymentSummaryIfNeeded();
         $this->invoice->refresh();
-        $this->invoice->load(['customer', 'partner', 'quotation', 'items.product', 'creator', 'confirmer', 'returner', 'payments.creator', 'payments.receiver']);
+        $this->invoice->load(['customer', 'partner', 'quotation', 'items.product', 'creator', 'confirmer', 'returner', 'payments.creator', 'payments.receiver', 'refunds.creator']);
         $itemIds = $this->invoice->items->pluck('id');
 
         $stockMovements = StockMovement::query()
@@ -171,6 +196,7 @@ class SalesInvoiceShow extends Component
         return view('livewire.sales-invoices.sales-invoice-show', [
             'stockMovements' => $stockMovements,
             'paymentMethods' => SalesInvoicePayment::methods(),
+            'refundMethods' => SalesInvoicePayment::methods(),
             'showProfit' => auth()->user()->hasPermission('sales.view_profit'),
         ])->layout('layouts.app', ['header' => 'فاتورة بيع: ' . $this->invoice->invoice_number]);
     }

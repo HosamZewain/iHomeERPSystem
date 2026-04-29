@@ -431,6 +431,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Status: implemented.
 - Components: `SalesInvoiceList`, `SalesInvoiceCreate`, `SalesInvoiceShow`.
 - Models: `SalesInvoice`, `SalesInvoiceItem`, `SalesInvoicePayment`.
+- Additional collection audit model: `SalesInvoiceRefund`.
 - Statuses: draft, confirmed, cancelled, returned.
 - Sales channels: direct and partner.
 - Draft sales invoices do not affect stock and can be edited.
@@ -442,11 +443,13 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Draft cancellation is supported.
 - Confirmed sales invoices are not cancelled directly; they now support a safe full return workflow:
   - full return is allowed only while the invoice is `confirmed`.
-  - full return is blocked if any payment is already recorded.
   - full return requires a reason and explicit confirmation from the UI.
   - status changes to `returned`.
   - `returned_at`, `returned_by`, and `return_reason` are stored for auditability.
   - stock is restored through `return_in` stock movements.
+  - if collected payments exist, the system records a full refund entry before completing the return.
+  - refund records are stored separately from payment records in `sales_invoice_refunds`.
+  - invoice payment summary uses net collected amount = payments - refunds.
   - current implementation is full-invoice return only, not partial line-item return.
 - Payment collection is invoice-based, not invoice-splitting:
   - one sale stays one sales invoice.
@@ -580,6 +583,10 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
   - they do not create extra invoices.
   - they do not change invoice totals.
   - they only update paid/remaining/payment-status fields and create payment history records.
+- Refunds are tracked separately from collections:
+  - they do not change invoice totals.
+  - they reduce net collected amount for payment-summary purposes.
+  - they are currently created automatically as part of full returned invoices when collected payments already exist.
 - Payment collection is currently allowed on confirmed sales invoices only; draft/cancelled invoices do not accept payments.
 - Database backup and restore does not change invoice business rules, but a full restore replaces the stored state of invoices, payments, stock, and all other database-backed records.
 - Mobile usability matters for quotation/invoice entry and all list/report pages.
@@ -639,7 +646,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Payment amount must be positive.
 - Each payment stores its own `remaining_amount_after` for receipt/history accuracy.
 - Payments do not change `gross_total`, `partner_commission_amount`, `net_revenue_after_partner_commission`, `total_cost`, or `total_profit`.
-- Full invoice return is blocked if any payment already exists on the invoice.
+- Refund records reduce net paid amount for payment summary purposes.
 - Legacy confirmed invoices created before payment-summary fields were backfilled may carry stale `remaining_amount` / `payment_status` values; a normalization migration exists and invoice show/print flows also self-heal stale summaries by recalculating from recorded payments and `gross_total`.
 
 ### Purchase Average Cost

@@ -177,6 +177,11 @@ class SalesInvoice extends Model
         return $this->hasMany(SalesInvoicePayment::class)->orderByDesc('payment_date')->orderByDesc('id');
     }
 
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(SalesInvoiceRefund::class)->orderByDesc('refund_date')->orderByDesc('id');
+    }
+
     public function canConfirm(): bool
     {
         return $this->status === SalesInvoiceStatus::Draft && $this->items()->exists();
@@ -195,8 +200,7 @@ class SalesInvoice extends Model
 
     public function canReverseConfirmed(): bool
     {
-        return $this->status === SalesInvoiceStatus::Confirmed
-            && round((float) $this->paid_amount, 2) <= 0;
+        return $this->status === SalesInvoiceStatus::Confirmed;
     }
 
     public function syncPaymentSummary(): void
@@ -430,14 +434,15 @@ class SalesInvoice extends Model
         ]);
     }
 
-    public function reverseConfirmed(string $reason, ?User $user = null): void
+    public function reverseConfirmed(string $reason, ?User $user = null, array $refundAttributes = []): void
     {
-        DB::transaction(function () use ($reason, $user) {
+        DB::transaction(function () use ($reason, $user, $refundAttributes) {
             $invoice = self::query()
                 ->whereKey($this->getKey())
                 ->lockForUpdate()
                 ->with(['items.product'])
                 ->withSum('payments', 'amount')
+                ->withSum('refunds', 'amount')
                 ->firstOrFail();
 
             if ($invoice->status !== SalesInvoiceStatus::Confirmed) {
@@ -452,10 +457,19 @@ class SalesInvoice extends Model
                 ]);
             }
 
-            if (round((float) ($invoice->payments_sum_amount ?? 0), 2) > 0) {
-                throw ValidationException::withMessages([
-                    'invoice' => 'لا يمكن تنفيذ مرتجع كامل لفاتورة يوجد عليها تحصيل مسجل. عالج الدفعات أولًا من مسار مخصص.',
-                ]);
+            $collectedAmount = round((float) ($invoice->payments_sum_amount ?? 0), 2);
+            $refundedAmount = round((float) ($invoice->refunds_sum_amount ?? 0), 2);
+            $refundableAmount = round(max($collectedAmount - $refundedAmount, 0), 2);
+
+            if ($refundableAmount > 0) {
+                $refundDate = $refundAttributes['refund_date'] ?? null;
+                $refundMethod = $refundAttributes['refund_method'] ?? null;
+
+                if (! $refundDate || ! $refundMethod) {
+                    throw ValidationException::withMessages([
+                        'refund' => 'لا بد من إدخال بيانات الاسترداد قبل تنفيذ مرتجع لفاتورة عليها دفعات محصلة.',
+                    ]);
+                }
             }
 
             $productIds = $invoice->items->pluck('product_id')->unique()->sort()->values();
@@ -501,14 +515,25 @@ class SalesInvoice extends Model
                 $balances[$product->id] = $balanceAfter;
             }
 
+            if ($refundableAmount > 0) {
+                $invoice->refunds()->create([
+                    'refund_date' => $refundAttributes['refund_date'],
+                    'amount' => $refundableAmount,
+                    'payment_method' => $refundAttributes['refund_method'],
+                    'reference_number' => $refundAttributes['refund_reference_number'] ?: null,
+                    'notes' => $refundAttributes['refund_notes'] ?: ('استرداد كامل عند تنفيذ مرتجع للفاتورة ' . $invoice->invoice_number),
+                    'created_by' => $user?->id,
+                ]);
+            }
+
             $invoice->update([
                 'status' => SalesInvoiceStatus::Returned,
-                'remaining_amount' => 0,
                 'return_reason' => $reason,
                 'returned_at' => now(),
                 'returned_by' => $user?->id,
             ]);
 
+            $invoice->syncPaymentSummary();
             $this->refresh();
         });
     }
@@ -595,7 +620,9 @@ class SalesInvoice extends Model
 
     private function calculatedPaymentSummary(): array
     {
-        $paidAmount = round((float) $this->payments()->sum('amount'), 2);
+        $collectedAmount = round((float) $this->payments()->sum('amount'), 2);
+        $refundedAmount = round((float) $this->refunds()->sum('amount'), 2);
+        $paidAmount = round(max($collectedAmount - $refundedAmount, 0), 2);
         $remainingAmount = in_array($this->status, [SalesInvoiceStatus::Cancelled, SalesInvoiceStatus::Returned], true)
             ? 0.0
             : round(max((float) $this->gross_total - $paidAmount, 0), 2);
