@@ -253,6 +253,47 @@ class SalesInvoiceTest extends TestCase
         $this->assertSame(0, StockMovement::query()->where('movement_type', StockMovement::TYPE_RETURN_IN)->count());
     }
 
+    public function test_sales_invoice_show_self_heals_stale_payment_summary_for_old_confirmed_invoice(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::factory()->create(['name' => 'Legacy Payment Customer']);
+        $product = Product::factory()->create(['name' => 'Legacy Payment Product', 'sale_price' => 500, 'is_active' => true]);
+
+        $invoice = SalesInvoice::factory()->create([
+            'customer_id' => $customer->id,
+            'status' => SalesInvoiceStatus::Confirmed->value,
+            'payment_status' => InvoicePaymentStatus::Unpaid->value,
+            'paid_amount' => 0,
+            'remaining_amount' => 0,
+            'gross_total' => 500,
+            'net_revenue_after_partner_commission' => 500,
+            'confirmed_at' => now(),
+            'created_by' => $user->id,
+            'confirmed_by' => $user->id,
+        ]);
+
+        SalesInvoiceItem::factory()->create([
+            'sales_invoice_id' => $invoice->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_sale_price' => 500,
+            'line_total' => 500,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales-invoices.show', $invoice))
+            ->assertOk()
+            ->assertSee('إضافة دفعة')
+            ->assertSee('المتبقي')
+            ->assertSee('500.00');
+
+        $invoice->refresh();
+
+        $this->assertSame(InvoicePaymentStatus::Unpaid, $invoice->payment_status);
+        $this->assertEquals(0.0, (float) $invoice->paid_amount);
+        $this->assertEquals(500.0, (float) $invoice->remaining_amount);
+    }
+
     public function test_partner_commission_is_separate_from_customer_invoice_total(): void
     {
         $user = User::factory()->create(['role' => 'admin']);

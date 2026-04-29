@@ -201,9 +201,26 @@ class SalesInvoice extends Model
 
     public function syncPaymentSummary(): void
     {
-        $paidAmount = round((float) $this->payments()->sum('amount'), 2);
-        $remainingAmount = round(max((float) $this->gross_total - $paidAmount, 0), 2);
-        $paymentStatus = InvoicePaymentStatus::fromAmounts($paidAmount, (float) $this->gross_total);
+        [$paidAmount, $remainingAmount, $paymentStatus] = $this->calculatedPaymentSummary();
+
+        $this->forceFill([
+            'payment_status' => $paymentStatus,
+            'paid_amount' => $paidAmount,
+            'remaining_amount' => $remainingAmount,
+        ])->saveQuietly();
+    }
+
+    public function syncPaymentSummaryIfNeeded(): void
+    {
+        [$paidAmount, $remainingAmount, $paymentStatus] = $this->calculatedPaymentSummary();
+
+        if (
+            round((float) $this->paid_amount, 2) === $paidAmount
+            && round((float) $this->remaining_amount, 2) === $remainingAmount
+            && $this->payment_status === $paymentStatus
+        ) {
+            return;
+        }
 
         $this->forceFill([
             'payment_status' => $paymentStatus,
@@ -574,5 +591,16 @@ class SalesInvoice extends Model
         }
 
         return round(max($fixedAmount, 0), 2);
+    }
+
+    private function calculatedPaymentSummary(): array
+    {
+        $paidAmount = round((float) $this->payments()->sum('amount'), 2);
+        $remainingAmount = in_array($this->status, [SalesInvoiceStatus::Cancelled, SalesInvoiceStatus::Returned], true)
+            ? 0.0
+            : round(max((float) $this->gross_total - $paidAmount, 0), 2);
+        $paymentStatus = InvoicePaymentStatus::fromAmounts($paidAmount, (float) $this->gross_total);
+
+        return [$paidAmount, $remainingAmount, $paymentStatus];
     }
 }

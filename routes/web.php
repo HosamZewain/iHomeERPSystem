@@ -113,6 +113,8 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/sales-invoices/create', SalesInvoiceCreate::class)->name('sales-invoices.create');
         Route::get('/sales-invoices/{salesInvoice}/edit', SalesInvoiceCreate::class)->name('sales-invoices.edit');
         Route::get('/sales-invoices/{salesInvoice}/print', function (SalesInvoice $salesInvoice) {
+            $salesInvoice->syncPaymentSummaryIfNeeded();
+            $salesInvoice->refresh();
             $salesInvoice->load(['customer', 'items.product', 'creator', 'quotation']);
             $selectedTemplate = PrintTemplate::resolveForDocument(PrintTemplate::TYPE_SALES_INVOICE, request()->integer('template') ?: null);
             $availableTemplates = PrintTemplate::query()
@@ -139,6 +141,8 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/sales-invoices/{salesInvoice}/payments/{salesInvoicePayment}/print', function (SalesInvoice $salesInvoice, SalesInvoicePayment $salesInvoicePayment) {
             abort_unless($salesInvoicePayment->sales_invoice_id === $salesInvoice->id, 404);
 
+            $salesInvoice->syncPaymentSummaryIfNeeded();
+            $salesInvoice->refresh();
             $salesInvoice->load(['customer', 'creator', 'quotation']);
             $salesInvoicePayment->load(['creator', 'receiver']);
             $selectedTemplate = PrintTemplate::resolveForDocument(PrintTemplate::TYPE_SALES_INVOICE, request()->integer('template') ?: null);

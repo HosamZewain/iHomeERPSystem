@@ -640,6 +640,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Each payment stores its own `remaining_amount_after` for receipt/history accuracy.
 - Payments do not change `gross_total`, `partner_commission_amount`, `net_revenue_after_partner_commission`, `total_cost`, or `total_profit`.
 - Full invoice return is blocked if any payment already exists on the invoice.
+- Legacy confirmed invoices created before payment-summary fields were backfilled may carry stale `remaining_amount` / `payment_status` values; a normalization migration exists and invoice show/print flows also self-heal stale summaries by recalculating from recorded payments and `gross_total`.
 
 ### Purchase Average Cost
 

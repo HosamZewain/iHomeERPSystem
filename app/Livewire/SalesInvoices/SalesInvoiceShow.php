@@ -23,6 +23,8 @@ class SalesInvoiceShow extends Component
     public function mount(SalesInvoice $salesInvoice): void
     {
         $this->invoice = $salesInvoice;
+        $this->invoice->syncPaymentSummaryIfNeeded();
+        $this->invoice->refresh();
         $this->resetPaymentForm();
     }
 
@@ -154,6 +156,8 @@ class SalesInvoiceShow extends Component
 
     public function render()
     {
+        $this->invoice->syncPaymentSummaryIfNeeded();
+        $this->invoice->refresh();
         $this->invoice->load(['customer', 'partner', 'quotation', 'items.product', 'creator', 'confirmer', 'returner', 'payments.creator', 'payments.receiver']);
         $itemIds = $this->invoice->items->pluck('id');
 
