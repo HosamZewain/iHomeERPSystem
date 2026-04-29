@@ -8,12 +8,16 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <x-stat-card label="مبيعات اليوم" :value="\App\Support\Money::format($cards['salesToday'])" icon="receipt" color="green" />
         <x-stat-card label="فواتير مؤكدة اليوم" :value="number_format($cards['confirmedInvoicesToday'])" icon="check-circle" color="blue" />
-        <x-stat-card label="ربح اليوم" :value="\App\Support\Money::format($cards['profitToday'])" icon="chart-bar" color="primary" />
+        <x-stat-card label="إجمالي ربح المبيعات اليوم" :value="\App\Support\Money::format($cards['grossProfitToday'])" icon="chart-bar" color="primary" />
+        <x-stat-card label="مصروفات اليوم" :value="\App\Support\Money::format($cards['expensesToday'])" icon="receipt" color="yellow" />
+        <x-stat-card label="صافي الربح اليوم" :value="\App\Support\Money::format($cards['netProfitToday'])" icon="chart-bar" color="green" />
         <x-stat-card label="عروض اليوم" :value="number_format($cards['quotationsToday'])" icon="document-text" color="yellow" />
 
         <x-stat-card label="مبيعات الشهر" :value="\App\Support\Money::format($cards['salesThisMonth'])" icon="receipt" color="green" />
         <x-stat-card label="فواتير مؤكدة هذا الشهر" :value="number_format($cards['confirmedInvoicesThisMonth'])" icon="check-circle" color="blue" />
-        <x-stat-card label="ربح الشهر" :value="\App\Support\Money::format($cards['profitThisMonth'])" icon="chart-bar" color="primary" />
+        <x-stat-card label="إجمالي ربح المبيعات هذا الشهر" :value="\App\Support\Money::format($cards['grossProfitThisMonth'])" icon="chart-bar" color="primary" />
+        <x-stat-card label="مصروفات هذا الشهر" :value="\App\Support\Money::format($cards['expensesThisMonth'])" icon="receipt" color="yellow" />
+        <x-stat-card label="صافي الربح هذا الشهر" :value="\App\Support\Money::format($cards['netProfitThisMonth'])" icon="chart-bar" color="green" />
         <x-stat-card label="عروض هذا الشهر" :value="number_format($cards['quotationsThisMonth'])" icon="document-text" color="yellow" />
 
         <x-stat-card label="عمولات الشركاء هذا الشهر" :value="\App\Support\Money::format($cards['partnerCommissionsThisMonth'])" icon="handshake" color="blue" />

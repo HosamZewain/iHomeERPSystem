@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Enums\SalesChannel;
 use App\Enums\SalesInvoiceStatus;
+use App\Models\Expense;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Models\Quotation;
@@ -31,11 +32,15 @@ class Dashboard extends Component
             'cards' => [
                 'salesToday' => $todaySales['sales'],
                 'confirmedInvoicesToday' => $todaySales['count'],
-                'profitToday' => $todaySales['profit'],
+                'grossProfitToday' => $todaySales['gross_profit'],
+                'expensesToday' => $todaySales['expenses'],
+                'netProfitToday' => $todaySales['net_profit'],
                 'quotationsToday' => Quotation::query()->whereDate('quotation_date', $today)->count(),
                 'salesThisMonth' => $monthSales['sales'],
                 'confirmedInvoicesThisMonth' => $monthSales['count'],
-                'profitThisMonth' => $monthSales['profit'],
+                'grossProfitThisMonth' => $monthSales['gross_profit'],
+                'expensesThisMonth' => $monthSales['expenses'],
+                'netProfitThisMonth' => $monthSales['net_profit'],
                 'quotationsThisMonth' => Quotation::query()->whereBetween('quotation_date', [$monthStart, $monthEnd])->count(),
                 'partnerCommissionsThisMonth' => $monthSales['partner_commissions'],
                 'netRevenueThisMonth' => $monthSales['net_revenue'],
@@ -74,15 +79,20 @@ class Dashboard extends Component
             ->whereBetween('invoice_date', [$startDate, $endDate])
             ->selectRaw('COUNT(*) as invoices_count')
             ->selectRaw('COALESCE(SUM(gross_total), 0) as sales_total')
-            ->selectRaw('COALESCE(SUM(total_profit), 0) as profit_total')
+            ->selectRaw('COALESCE(SUM(total_profit), 0) as gross_profit_total')
             ->selectRaw('COALESCE(SUM(partner_commission_amount), 0) as partner_commissions_total')
             ->selectRaw('COALESCE(SUM(net_revenue_after_partner_commission), 0) as net_revenue_total')
             ->first();
 
+        $expenses = Expense::totalForPeriod($startDate, $endDate);
+        $grossProfit = (float) $totals->gross_profit_total;
+
         return [
             'count' => (int) $totals->invoices_count,
             'sales' => (float) $totals->sales_total,
-            'profit' => (float) $totals->profit_total,
+            'gross_profit' => $grossProfit,
+            'expenses' => $expenses,
+            'net_profit' => round($grossProfit - $expenses, 2),
             'partner_commissions' => (float) $totals->partner_commissions_total,
             'net_revenue' => (float) $totals->net_revenue_total,
         ];

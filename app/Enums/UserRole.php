@@ -54,6 +54,7 @@ enum UserRole: string
                 'partners.manage',
                 'products.manage', 'products.view_cost',
                 'purchases.manage',
+                'expenses.manage',
                 'quotations.create', 'quotations.edit', 'quotations.convert',
                 'sales.create', 'sales.void', 'sales.view_profit',
                 'settlements.view',
@@ -68,6 +69,7 @@ enum UserRole: string
                 'partners.manage',
                 'products.manage', 'products.view_cost',
                 'purchases.manage',
+                'expenses.manage',
                 'quotations.create', 'quotations.edit', 'quotations.convert',
                 'sales.create', 'sales.void', 'sales.view_profit',
                 'settlements.view',
@@ -90,6 +92,7 @@ enum UserRole: string
             self::Purchasing => [
                 'suppliers.manage',
                 'purchases.manage',
+                'expenses.manage',
                 'products.view_cost',
                 'stock.view', 'stock.view_cost',
             ],

@@ -4,6 +4,7 @@ namespace App\Livewire\Reports;
 
 use App\Enums\SalesChannel;
 use App\Enums\SalesInvoiceStatus;
+use App\Models\Expense;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Models\SalesInvoice;
@@ -108,18 +109,22 @@ class SalesReport extends Component
             ->selectRaw('COALESCE(SUM(gross_total), 0) as gross_sales')
             ->selectRaw('COALESCE(SUM(partner_commission_amount), 0) as partner_commissions')
             ->selectRaw('COALESCE(SUM(net_revenue_after_partner_commission), 0) as net_revenue')
-            ->selectRaw('COALESCE(SUM(total_profit), 0) as profit')
+            ->selectRaw('COALESCE(SUM(total_profit), 0) as gross_profit')
             ->first();
 
         $count = (int) $totals->invoices_count;
         $grossSales = (float) $totals->gross_sales;
+        $expenses = Expense::totalForPeriod($startDate, $endDate);
+        $grossProfit = (float) $totals->gross_profit;
 
         return [
             'grossSales' => $grossSales,
             'confirmedInvoices' => $count,
             'partnerCommissions' => (float) $totals->partner_commissions,
             'netRevenue' => (float) $totals->net_revenue,
-            'profit' => (float) $totals->profit,
+            'grossProfit' => $grossProfit,
+            'expenses' => $expenses,
+            'netProfit' => round($grossProfit - $expenses, 2),
             'averageInvoiceValue' => $count > 0 ? round($grossSales / $count, 2) : 0.0,
         ];
     }

@@ -6,6 +6,8 @@ use App\Livewire\Categories\CategoryList;
 use App\Livewire\Customers\CustomerList;
 use App\Livewire\Customers\CustomerShow;
 use App\Livewire\Dashboard;
+use App\Livewire\Expenses\ExpenseCategoryList;
+use App\Livewire\Expenses\ExpenseList;
 use App\Livewire\Partners\PartnerList;
 use App\Livewire\Partners\PartnerShow;
 use App\Livewire\Products\ProductList;
@@ -76,6 +78,11 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/purchase-invoices', PurchaseInvoiceList::class)->name('purchase-invoices.index');
         Route::get('/purchase-invoices/create', PurchaseInvoiceCreate::class)->name('purchase-invoices.create');
         Route::get('/purchase-invoices/{purchaseInvoice}', PurchaseInvoiceShow::class)->name('purchase-invoices.show');
+    });
+
+    Route::middleware('permission:expenses.manage')->group(function () {
+        Route::get('/expenses', ExpenseList::class)->name('expenses.index');
+        Route::get('/expenses/categories', ExpenseCategoryList::class)->name('expenses.categories');
     });
 
     Route::middleware('permission:quotations.create')->group(function () {

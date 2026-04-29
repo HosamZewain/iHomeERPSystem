@@ -296,7 +296,12 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Status: implemented.
 - Component: `App\Livewire\Dashboard`.
 - Shows sales/profit/quotation/stock KPI cards, recent invoices/quotations, top products/customers/partners, low stock products, and simple chart-style sections.
-- Uses confirmed sales invoices only for sales/profit dashboard metrics.
+- Dashboard sales/profit metrics use confirmed sales invoices only for operational sales figures.
+- Dashboard now distinguishes between:
+  - gross sales profit
+  - period expenses
+  - net profit after expenses
+- Expense deduction is period-based by `expenses.expense_date`, not allocated per invoice.
 
 ### Users / Roles
 
@@ -308,6 +313,9 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Middleware: `CheckPermission`, `CheckRole`, `EnsureUserIsActive`.
 - Seeder creates default users with password `password`; do not rely on that in production without changing passwords.
 - Admin-only system operations such as database backup/restore should stay behind `role:admin` routes, not merely general settings permissions.
+- Expenses module permission:
+  - `expenses.manage`
+  - currently granted to `admin`, `manager`, and `purchasing`
 
 ### Database Backups
 
@@ -373,6 +381,34 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Partner fields include type, phone/contact data, default commission type/value, notes, active/inactive status.
 - Partner commission is separate from customer discount and must remain separate.
 - Partner detail page shows partner sales invoices, confirmed sales/collection summary, commission totals, invoice-level commission history, and top customers linked to that partner.
+
+### Expense Categories
+
+- Status: implemented.
+- Livewire CRUD: `App\Livewire\Expenses\ExpenseCategoryList`.
+- Model: `App\Models\ExpenseCategory`.
+- Fields: `name`, `is_active`, `notes`.
+- Soft deletes enabled.
+- Category deletion is blocked while linked expenses exist.
+
+### Expenses
+
+- Status: implemented.
+- Livewire CRUD: `App\Livewire\Expenses\ExpenseList`.
+- Model: `App\Models\Expense`.
+- Fields include category, title, amount, expense date, expense type, recurring frequency, payment status, paid amount, remaining amount, vendor/payee name, notes, creator, and optional `generated_from_expense_id`.
+- Soft deletes enabled.
+- Payment status is normalized automatically from `paid_amount` versus `amount`.
+- Expenses are operational period records only; they do not affect stock, invoice totals, or invoice-level sales profit calculations.
+- For dashboard and sales report profitability:
+  - expenses are counted by `expense_date`
+  - the system currently uses the full recorded `amount`
+  - `payment_status` is tracked operationally but is not used to exclude expenses from net profit
+- Recurring behavior is manual:
+  - recurring expenses store frequency (`monthly`, `quarterly`, `yearly`)
+  - the UI supports “generate next occurrence”
+  - the new occurrence is linked through `generated_from_expense_id`
+  - duplicate next-period generation from the same source expense is blocked
 
 ### Products
 
@@ -532,7 +568,8 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
   - `App\Livewire\Reports\SalesReport`.
   - Month/date-range filtering.
   - Confirmed sales invoices only.
-  - Gross sales, confirmed invoice count, partner commissions, net revenue, profit, average invoice value, top products/customers/partners, channel breakdown.
+  - Gross sales, confirmed invoice count, partner commissions, net revenue, gross sales profit, period expenses, net profit after expenses, average invoice value, top products/customers/partners, channel breakdown.
+  - Expense deduction uses `expenses.expense_date` within the selected report range.
 - Stock report:
   - `App\Livewire\Reports\StockReport`.
   - Search/filters/sorting.
@@ -605,6 +642,11 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
   - they do not change invoice totals.
   - they reduce net collected amount for payment-summary purposes.
   - they are currently created automatically as part of full returned invoices when collected payments already exist.
+- Expenses are operational business records:
+  - they are not stock items
+  - they do not affect stock
+  - they do not affect invoice totals
+  - they reduce only period-level net profit reporting
 - Payment collection is currently allowed on confirmed sales invoices only; draft/cancelled invoices do not accept payments.
 - Database backup and restore does not change invoice business rules, but a full restore replaces the stored state of invoices, payments, stock, and all other database-backed records.
 - Mobile usability matters for quotation/invoice entry and all list/report pages.
@@ -667,6 +709,18 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Refund records reduce net paid amount for payment summary purposes.
 - Legacy confirmed invoices created before payment-summary fields were backfilled may carry stale `remaining_amount` / `payment_status` values; a normalization migration exists and invoice show/print flows also self-heal stale summaries by recalculating from recorded payments and `gross_total`.
 
+### Expense Impact On Profit Reporting
+
+- Gross sales profit remains the existing sales-operation profit already calculated from confirmed sales invoices.
+- Period expenses are calculated from `expenses.amount` for rows whose `expense_date` falls inside the selected period.
+- Current chosen rule:
+  - include all recorded expenses by date, regardless of expense `payment_status`
+  - this is intentional for operational profitability, not cash-flow accounting
+- Net profit for dashboard and sales report:
+  - `net profit = gross sales profit - period expenses`
+- Expenses are not allocated to invoice rows, products, installation lines, or partners.
+- Do not change sales invoice profit formulas when working on expenses/reporting unless explicitly requested.
+
 ### Purchase Average Cost
 
 - On purchase invoice confirmation:
@@ -700,6 +754,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - EGP money formatting helper.
 - Dashboard.
 - Categories, suppliers, customers, partners CRUD plus read-only detail pages with summary stats and linked invoice/product/commission data.
+- Expense categories and expenses CRUD with manual recurring occurrence generation.
 - Products CRUD with images and stock visibility.
 - Purchase invoices with confirmation stock increase and average cost update.
 - Movement-based stock model, summary, movement history, and stock report.
@@ -708,6 +763,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Multiple print templates for quotations and sales invoices.
 - Print template branding image uploads and warranty terms page.
 - Sales and stock reports.
+- Dashboard and sales report now distinguish gross sales profit from net profit after expenses.
 - ERPNext cleaned CSV import command with dry-run and import logging.
 - Admin-only database backup creation, download, upload, and full restore using tracked backup metadata.
 - Basic PWA files.
@@ -722,6 +778,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Sales invoice return currently supports full-invoice reversal only; partial line-item returns/credit-note style flows are not implemented.
 - Installation provider tracking is simple fields only; no separate technician/employee/company provider module exists.
 - Payment data is report-ready, but there is not yet a dedicated collections/receivables report screen.
+- Expenses are practical operational tracking only; there is no approval workflow, attachment storage, vendor ledger, or accounting journal integration.
 - PWA is installable/basic shell-oriented only; offline transaction sync is not implemented.
 - Deployment to Hostinger shared hosting works with PHP 8.4 and copied/served `public_html`, but this is environment-specific and should be verified during deployment.
 
@@ -731,6 +788,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Supplier return workflow.
 - Supplier-side or standalone return document workflow.
 - Stock adjustment approval/audit controls beyond the current direct adjustment UI.
+- Expense approval workflow, file attachments, and cash-flow/accounting reconciliation.
 - Advanced PDF generation engine; current print flow is browser print.
 - Full multilingual language switcher; Arabic is primary and English can be added later.
 - Advanced offline/PWA transaction sync.
@@ -744,6 +802,8 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Do not redesign unrelated modules while implementing a targeted change.
 - Do not mutate stock directly; use stock movements or a safe dedicated workflow.
 - If the user asks to “edit stock”, implement it as a stock adjustment workflow that creates `StockMovement` records; do not write silent stock quantities onto products.
+- Do not make expenses affect stock, invoice totals, installation totals, or partner commission formulas.
+- Expense reporting is period-level only; do not allocate expenses artificially across invoice rows unless the business rule explicitly changes.
 - Do not treat installation as a product.
 - Do not apply invoice-level discount to installation.
 - Do not treat partner commission as a customer discount.

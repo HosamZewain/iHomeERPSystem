@@ -33,6 +33,14 @@
     <x-nav-link route="purchase-invoices.index" icon="truck" :label="__('ui.nav.purchase_invoices')" />
 @endif
 
+@if($user->hasPermission('expenses.manage'))
+    <div class="pt-4 pb-1">
+        <p class="px-3 text-xs font-semibold text-primary-400 uppercase tracking-wider">{{ __('ui.nav.finance') }}</p>
+    </div>
+    <x-nav-link route="expenses.index" icon="receipt" :label="__('ui.nav.expenses')" />
+    <x-nav-link route="expenses.categories" icon="tag" :label="__('ui.nav.expense_categories')" />
+@endif
+
 @if($user->hasAnyPermission(['customers.create', 'suppliers.manage', 'partners.manage']))
     <div class="pt-4 pb-1">
         <p class="px-3 text-xs font-semibold text-primary-400 uppercase tracking-wider">{{ __('ui.nav.people') }}</p>

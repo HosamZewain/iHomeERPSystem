@@ -6,6 +6,8 @@ use App\Enums\SalesChannel;
 use App\Enums\SalesInvoiceStatus;
 use App\Livewire\Reports\SalesReport;
 use App\Models\Customer;
+use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Models\SalesInvoice;
@@ -105,6 +107,16 @@ class SalesReportTest extends TestCase
             'created_by' => $user->id,
         ]);
 
+        $expenseCategory = ExpenseCategory::factory()->create(['name' => 'إعلانات']);
+        Expense::factory()->create([
+            'expense_category_id' => $expenseCategory->id,
+            'title' => 'إعلان أبريل',
+            'amount' => 150,
+            'expense_date' => '2026-04-12',
+            'paid_amount' => 0,
+            'created_by' => $user->id,
+        ]);
+
         $this->actingAs($user)
             ->get(route('reports.sales'))
             ->assertOk()
@@ -112,6 +124,8 @@ class SalesReportTest extends TestCase
             ->assertSee('3,000.00 ج.م')
             ->assertSee('2,800.00 ج.م')
             ->assertSee('750.00 ج.م')
+            ->assertSee('150.00 ج.م')
+            ->assertSee('600.00 ج.م')
             ->assertSee('200.00 ج.م')
             ->assertSee('1,500.00 ج.م')
             ->assertSee('Report Switch')
@@ -152,12 +166,23 @@ class SalesReportTest extends TestCase
             'created_by' => $user->id,
         ]);
 
+        $expenseCategory = ExpenseCategory::factory()->create(['name' => 'نقل']);
+        Expense::factory()->create([
+            'expense_category_id' => $expenseCategory->id,
+            'title' => 'نقل يوم 10',
+            'amount' => 20,
+            'expense_date' => '2026-04-10',
+            'created_by' => $user->id,
+        ]);
+
         Livewire::actingAs($user)
             ->test(SalesReport::class)
             ->set('reportMode', 'range')
             ->set('startDate', '2026-04-10')
             ->set('endDate', '2026-04-10')
             ->assertSee('400.00 ج.م')
+            ->assertSee('20.00 ج.م')
+            ->assertSee('100.00 ج.م')
             ->assertSee('120.00 ج.م')
             ->assertDontSee('800.00 ج.م');
     }

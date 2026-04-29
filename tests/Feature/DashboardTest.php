@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Enums\SalesChannel;
 use App\Enums\SalesInvoiceStatus;
 use App\Models\Customer;
+use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Models\Quotation;
@@ -133,12 +135,24 @@ class DashboardTest extends TestCase
             'created_by' => $user->id,
         ]);
 
+        $expenseCategory = ExpenseCategory::factory()->create(['name' => 'إيجار']);
+        Expense::factory()->create([
+            'expense_category_id' => $expenseCategory->id,
+            'title' => 'إيجار أبريل',
+            'amount' => 300,
+            'expense_date' => '2026-04-12',
+            'paid_amount' => 0,
+            'created_by' => $user->id,
+        ]);
+
         $this->actingAs($user)
             ->get(route('dashboard'))
             ->assertOk()
             ->assertSee('مبيعات اليوم')
             ->assertSee('3,000.00 ج.م')
             ->assertSee('900.00 ج.م')
+            ->assertSee('300.00 ج.م')
+            ->assertSee('600.00 ج.م')
             ->assertSee('200.00 ج.م')
             ->assertSee('2,800.00 ج.م')
             ->assertSee('700.00 ج.م')

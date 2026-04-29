@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Category;
 use App\Models\Customer;
+use App\Models\ExpenseCategory;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Models\Setting;
@@ -107,6 +108,20 @@ class DatabaseSeeder extends Seeder
 
         foreach ($partners as $partner) {
             Partner::firstOrCreate(['name' => $partner['name']], $partner);
+        }
+
+        foreach ([
+            'إيجار',
+            'رواتب',
+            'فواتير',
+            'إعلانات وتسويق',
+            'إنترنت واتصالات',
+            'مواصلات',
+            'صيانة',
+            'مستلزمات مكتبية',
+            'أخرى',
+        ] as $expenseCategory) {
+            ExpenseCategory::firstOrCreate(['name' => $expenseCategory], ['is_active' => true]);
         }
 
         $lighting = Category::where('name', 'Lighting')->first();

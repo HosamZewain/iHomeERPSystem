@@ -40,7 +40,7 @@
         </div>
 
         <p class="mt-4 text-sm text-gray-500">
-            الفترة المعروضة: {{ $periodStart }} إلى {{ $periodEnd }}. يعتمد التقرير على فواتير البيع المؤكدة فقط.
+            الفترة المعروضة: {{ $periodStart }} إلى {{ $periodEnd }}. يعتمد التقرير على فواتير البيع المؤكدة فقط، وتُخصم المصروفات حسب تاريخ المصروف المسجل بغض النظر عن حالة السداد.
         </p>
     </div>
 
@@ -49,7 +49,9 @@
         <x-stat-card label="عدد الفواتير المؤكدة" :value="number_format($totals['confirmedInvoices'])" icon="check-circle" color="blue" />
         <x-stat-card label="عمولات الشركاء" :value="\App\Support\Money::format($totals['partnerCommissions'])" icon="handshake" color="yellow" />
         <x-stat-card label="صافي الإيراد بعد العمولات" :value="\App\Support\Money::format($totals['netRevenue'])" icon="chart-bar" color="primary" />
-        <x-stat-card label="إجمالي الربح" :value="\App\Support\Money::format($totals['profit'])" icon="chart-bar" color="green" />
+        <x-stat-card label="إجمالي ربح المبيعات" :value="\App\Support\Money::format($totals['grossProfit'])" icon="chart-bar" color="green" />
+        <x-stat-card label="إجمالي المصروفات" :value="\App\Support\Money::format($totals['expenses'])" icon="receipt" color="yellow" />
+        <x-stat-card label="صافي الربح بعد المصروفات" :value="\App\Support\Money::format($totals['netProfit'])" icon="chart-bar" color="primary" />
         <x-stat-card label="متوسط قيمة الفاتورة" :value="\App\Support\Money::format($totals['averageInvoiceValue'])" icon="receipt" color="gray" />
     </div>
 
