@@ -90,6 +90,8 @@ class PurchaseInvoiceList extends Component
             'status' => $query->orderBy('status', $direction),
             'items_count' => $query->orderBy('items_count', $direction),
             'total' => $query->orderBy('total', $direction),
+            'created_at' => $query->orderBy('created_at', $direction),
+            'updated_at' => $query->orderBy('updated_at', $direction),
             default => $query->orderBy('invoice_date', $direction),
         };
 
@@ -105,6 +107,8 @@ class PurchaseInvoiceList extends Component
             'status' => 'الحالة',
             'items_count' => 'البنود',
             'total' => 'الإجمالي',
+            'created_at' => 'تاريخ الإنشاء',
+            'updated_at' => 'آخر تحديث',
         ];
     }
 }

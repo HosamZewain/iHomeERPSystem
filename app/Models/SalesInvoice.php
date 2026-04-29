@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CommissionType;
+use App\Enums\InvoicePaymentStatus;
 use App\Enums\SalesChannel;
 use App\Enums\SalesInvoiceStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -57,10 +58,17 @@ class SalesInvoice extends Model
         'total_cost',
         'total_profit',
         'status',
+        'payment_status',
+        'paid_amount',
+        'remaining_amount',
+        'due_date',
+        'return_reason',
         'confirmed_at',
         'cancelled_at',
+        'returned_at',
         'created_by',
         'confirmed_by',
+        'returned_by',
     ];
 
     protected function casts(): array
@@ -85,8 +93,14 @@ class SalesInvoice extends Model
             'total_cost' => 'decimal:2',
             'total_profit' => 'decimal:2',
             'status' => SalesInvoiceStatus::class,
+            'payment_status' => InvoicePaymentStatus::class,
+            'paid_amount' => 'decimal:2',
+            'remaining_amount' => 'decimal:2',
+            'due_date' => 'date',
+            'return_reason' => 'string',
             'confirmed_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'returned_at' => 'datetime',
         ];
     }
 
@@ -99,6 +113,9 @@ class SalesInvoice extends Model
             $invoice->partner_commission_type ??= self::DISCOUNT_FIXED;
             $invoice->installation_pricing_mode ??= self::INSTALLATION_FIXED;
             $invoice->installation_party_type ??= self::INSTALLATION_PARTY_NONE;
+            $invoice->paid_amount ??= 0;
+            $invoice->remaining_amount = round(max((float) $invoice->gross_total - (float) $invoice->paid_amount, 0), 2);
+            $invoice->payment_status = InvoicePaymentStatus::fromAmounts((float) $invoice->paid_amount, (float) $invoice->gross_total);
         });
     }
 
@@ -143,9 +160,21 @@ class SalesInvoice extends Model
         return $this->belongsTo(User::class, 'confirmed_by');
     }
 
+    public function returner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'returned_by');
+    }
+
     public function items(): HasMany
     {
-        return $this->hasMany(SalesInvoiceItem::class);
+        return $this->hasMany(SalesInvoiceItem::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(SalesInvoicePayment::class)->orderByDesc('payment_date')->orderByDesc('id');
     }
 
     public function canConfirm(): bool
@@ -156,6 +185,93 @@ class SalesInvoice extends Model
     public function canCancel(): bool
     {
         return $this->status === SalesInvoiceStatus::Draft;
+    }
+
+    public function canReceivePayments(): bool
+    {
+        return $this->status === SalesInvoiceStatus::Confirmed
+            && round((float) $this->remaining_amount, 2) > 0;
+    }
+
+    public function canReverseConfirmed(): bool
+    {
+        return $this->status === SalesInvoiceStatus::Confirmed
+            && round((float) $this->paid_amount, 2) <= 0;
+    }
+
+    public function syncPaymentSummary(): void
+    {
+        $paidAmount = round((float) $this->payments()->sum('amount'), 2);
+        $remainingAmount = round(max((float) $this->gross_total - $paidAmount, 0), 2);
+        $paymentStatus = InvoicePaymentStatus::fromAmounts($paidAmount, (float) $this->gross_total);
+
+        $this->forceFill([
+            'payment_status' => $paymentStatus,
+            'paid_amount' => $paidAmount,
+            'remaining_amount' => $remainingAmount,
+        ])->saveQuietly();
+    }
+
+    public function recordPayment(array $attributes, ?User $user = null): SalesInvoicePayment
+    {
+        return DB::transaction(function () use ($attributes, $user) {
+            $invoice = self::query()
+                ->whereKey($this->getKey())
+                ->lockForUpdate()
+                ->withSum('payments', 'amount')
+                ->firstOrFail();
+
+            if ($invoice->status === SalesInvoiceStatus::Cancelled) {
+                throw ValidationException::withMessages([
+                    'payment' => 'لا يمكن تسجيل دفعات على فاتورة بيع ملغاة.',
+                ]);
+            }
+
+            if ($invoice->status !== SalesInvoiceStatus::Confirmed) {
+                throw ValidationException::withMessages([
+                    'payment' => 'يمكن تسجيل الدفعات على فواتير البيع المؤكدة فقط.',
+                ]);
+            }
+
+            $paidAmount = round((float) ($invoice->payments_sum_amount ?? 0), 2);
+            $remainingAmount = round(max((float) $invoice->gross_total - $paidAmount, 0), 2);
+            $amount = round((float) ($attributes['amount'] ?? 0), 2);
+
+            if ($amount <= 0) {
+                throw ValidationException::withMessages([
+                    'payment_amount' => 'قيمة الدفعة يجب أن تكون أكبر من صفر.',
+                ]);
+            }
+
+            if ($remainingAmount <= 0) {
+                throw ValidationException::withMessages([
+                    'payment_amount' => 'الفاتورة مسددة بالكامل بالفعل.',
+                ]);
+            }
+
+            if ($amount > $remainingAmount) {
+                throw ValidationException::withMessages([
+                    'payment_amount' => 'قيمة الدفعة أكبر من الرصيد المتبقي على الفاتورة.',
+                ]);
+            }
+
+            $payment = $invoice->payments()->create([
+                'receipt_number' => $attributes['receipt_number'] ?? null,
+                'payment_date' => $attributes['payment_date'],
+                'amount' => $amount,
+                'payment_method' => $attributes['payment_method'],
+                'reference_number' => $attributes['reference_number'] ?: null,
+                'notes' => $attributes['notes'] ?: null,
+                'remaining_amount_after' => round($remainingAmount - $amount, 2),
+                'received_by' => $attributes['received_by'] ?? $user?->id,
+                'created_by' => $user?->id,
+            ]);
+
+            $invoice->syncPaymentSummary();
+            $this->refresh();
+
+            return $payment->load(['creator', 'receiver', 'salesInvoice.customer']);
+        });
     }
 
     public function confirm(?User $user = null): void
@@ -273,6 +389,8 @@ class SalesInvoice extends Model
                 'total_cost' => round($totalCost, 2),
                 'total_profit' => round($productProfit + $installationProfit - $partnerCommissionAmount, 2),
                 'status' => SalesInvoiceStatus::Confirmed,
+                'payment_status' => InvoicePaymentStatus::fromAmounts((float) $invoice->paid_amount, $grossTotal),
+                'remaining_amount' => round(max($grossTotal - (float) $invoice->paid_amount, 0), 2),
                 'confirmed_at' => now(),
                 'confirmed_by' => $user?->id,
             ]);
@@ -293,6 +411,89 @@ class SalesInvoice extends Model
             'status' => SalesInvoiceStatus::Cancelled,
             'cancelled_at' => now(),
         ]);
+    }
+
+    public function reverseConfirmed(string $reason, ?User $user = null): void
+    {
+        DB::transaction(function () use ($reason, $user) {
+            $invoice = self::query()
+                ->whereKey($this->getKey())
+                ->lockForUpdate()
+                ->with(['items.product'])
+                ->withSum('payments', 'amount')
+                ->firstOrFail();
+
+            if ($invoice->status !== SalesInvoiceStatus::Confirmed) {
+                throw ValidationException::withMessages([
+                    'invoice' => 'يمكن تنفيذ مرتجع فقط على فواتير البيع المؤكدة.',
+                ]);
+            }
+
+            if ($invoice->items->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'invoice' => 'لا يمكن تنفيذ المرتجع لأن الفاتورة لا تحتوي على بنود.',
+                ]);
+            }
+
+            if (round((float) ($invoice->payments_sum_amount ?? 0), 2) > 0) {
+                throw ValidationException::withMessages([
+                    'invoice' => 'لا يمكن تنفيذ مرتجع كامل لفاتورة يوجد عليها تحصيل مسجل. عالج الدفعات أولًا من مسار مخصص.',
+                ]);
+            }
+
+            $productIds = $invoice->items->pluck('product_id')->unique()->sort()->values();
+            $products = Product::query()
+                ->whereKey($productIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            $balances = [];
+            $movementDate = now()->toDateString();
+
+            foreach ($invoice->items as $item) {
+                $product = $products->get($item->product_id);
+
+                if (! $product) {
+                    throw ValidationException::withMessages([
+                        'invoice' => 'تعذر العثور على المنتج المرتبط بأحد بنود الفاتورة لتنفيذ المرتجع.',
+                    ]);
+                }
+
+                $currentQuantity = $balances[$product->id] ?? $product->current_stock_quantity;
+                $quantity = round((float) $item->quantity, 2);
+                $costAtSale = round((float) ($item->cost_at_sale_time ?: $product->current_average_cost), 2);
+                $lineCost = round($quantity * $costAtSale, 2);
+                $balanceAfter = round($currentQuantity + $quantity, 2);
+
+                StockMovement::create([
+                    'product_id' => $product->id,
+                    'movement_type' => StockMovement::TYPE_RETURN_IN,
+                    'source_type' => StockMovement::SOURCE_RETURN,
+                    'source_id' => $item->id,
+                    'created_by' => $user?->id,
+                    'quantity' => $quantity,
+                    'balance_after' => $balanceAfter,
+                    'unit_cost' => $costAtSale,
+                    'total_cost' => $lineCost,
+                    'movement_date' => $movementDate,
+                    'notes' => 'مرتجع فاتورة بيع ' . $invoice->invoice_number . ($reason !== '' ? ' - ' . $reason : ''),
+                ]);
+
+                $balances[$product->id] = $balanceAfter;
+            }
+
+            $invoice->update([
+                'status' => SalesInvoiceStatus::Returned,
+                'remaining_amount' => 0,
+                'return_reason' => $reason,
+                'returned_at' => now(),
+                'returned_by' => $user?->id,
+            ]);
+
+            $this->refresh();
+        });
     }
 
     public static function discountTypes(): array
@@ -317,6 +518,13 @@ class SalesInvoice extends Model
             self::INSTALLATION_FIXED => 'مبلغ ثابت',
             self::INSTALLATION_PERCENTAGE => 'نسبة من إجمالي المنتجات',
         ];
+    }
+
+    public static function paymentStatuses(): array
+    {
+        return collect(InvoicePaymentStatus::cases())
+            ->mapWithKeys(fn (InvoicePaymentStatus $status) => [$status->value => $status->label()])
+            ->all();
     }
 
     public static function installationPartyTypes(): array

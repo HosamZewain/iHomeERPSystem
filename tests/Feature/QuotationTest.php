@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\QuotationStatus;
+use App\Enums\InvoicePaymentStatus;
 use App\Enums\SalesChannel;
 use App\Enums\SalesInvoiceStatus;
 use App\Livewire\Quotations\QuotationForm;
@@ -142,6 +143,36 @@ class QuotationTest extends TestCase
             ->assertDontSee('Beta Switch');
     }
 
+    public function test_quotation_form_can_create_customer_inline_and_select_it(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $product = Product::factory()->create([
+            'sale_price' => 750,
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(QuotationForm::class)
+            ->set('quotation_number', 'QUO-TEST-INLINE-CUSTOMER')
+            ->set('quotation_date', '2026-04-26')
+            ->call('showCreateCustomer')
+            ->set('new_customer_name', 'عميل من شاشة العرض')
+            ->set('new_customer_phone', '01099999999')
+            ->set('new_customer_email', 'quote-customer@example.com')
+            ->call('createCustomer')
+            ->set('items.0.product_id', (string) $product->id)
+            ->set('items.0.quantity', '1')
+            ->set('items.0.unit_sale_price', '750')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $customer = Customer::query()->where('phone', '01099999999')->firstOrFail();
+        $quotation = Quotation::query()->firstOrFail();
+
+        $this->assertSame('عميل من شاشة العرض', $customer->name);
+        $this->assertSame($customer->id, $quotation->customer_id);
+    }
+
     public function test_quotation_conversion_creates_draft_sales_invoice_without_stock_movement(): void
     {
         $user = User::factory()->create(['role' => 'admin']);
@@ -203,6 +234,9 @@ class QuotationTest extends TestCase
         $this->assertEquals(300.0, (float) $invoice->installation_profit);
         $this->assertSame('Installation included.', $invoice->installation_notes);
         $this->assertEquals(1830.0, (float) $invoice->gross_total);
+        $this->assertSame(InvoicePaymentStatus::Unpaid, $invoice->payment_status);
+        $this->assertEquals(0.0, (float) $invoice->paid_amount);
+        $this->assertEquals(1830.0, (float) $invoice->remaining_amount);
         $this->assertEquals(1830.0, (float) $invoice->net_revenue_after_partner_commission);
         $this->assertSame($product->id, $invoiceItem->product_id);
         $this->assertEquals(2.0, (float) $invoiceItem->quantity);
@@ -245,5 +279,53 @@ class QuotationTest extends TestCase
         }
 
         $this->assertSame(1, SalesInvoice::query()->count());
+    }
+
+    public function test_quotation_item_order_is_preserved_in_save_print_and_conversion(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::factory()->create();
+        $productA = Product::factory()->create(['name' => 'Product A', 'internal_sku' => 'A-1', 'sale_price' => 100, 'is_active' => true]);
+        $productB = Product::factory()->create(['name' => 'Product B', 'internal_sku' => 'B-1', 'sale_price' => 200, 'is_active' => true]);
+        $productC = Product::factory()->create(['name' => 'Product C', 'internal_sku' => 'C-1', 'sale_price' => 300, 'is_active' => true]);
+
+        Livewire::actingAs($user)
+            ->test(QuotationForm::class)
+            ->set('quotation_number', 'QUO-ORDER-001')
+            ->set('customer_id', (string) $customer->id)
+            ->set('quotation_date', '2026-04-26')
+            ->set('items.0.product_id', (string) $productA->id)
+            ->set('items.0.quantity', '1')
+            ->set('items.0.unit_sale_price', '100')
+            ->call('addItem')
+            ->set('items.1.product_id', (string) $productC->id)
+            ->set('items.1.quantity', '1')
+            ->set('items.1.unit_sale_price', '300')
+            ->call('addItem')
+            ->set('items.2.product_id', (string) $productB->id)
+            ->set('items.2.quantity', '1')
+            ->set('items.2.unit_sale_price', '200')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $quotation = Quotation::query()->with('items.product')->firstOrFail();
+
+        $this->assertSame([$productA->id, $productC->id, $productB->id], $quotation->items->pluck('product_id')->all());
+        $this->assertSame([1, 2, 3], $quotation->items->pluck('sort_order')->all());
+
+        $this->actingAs($user)
+            ->get(route('quotations.show', $quotation))
+            ->assertOk()
+            ->assertSeeInOrder(['Product A', 'Product C', 'Product B']);
+
+        $this->actingAs($user)
+            ->get(route('quotations.print', $quotation))
+            ->assertOk()
+            ->assertSeeInOrder(['Product A', 'Product C', 'Product B']);
+
+        $invoice = $quotation->convertToSalesInvoice($user)->load('items.product');
+
+        $this->assertSame([$productA->id, $productC->id, $productB->id], $invoice->items->pluck('product_id')->all());
+        $this->assertSame([1, 2, 3], $invoice->items->pluck('sort_order')->all());
     }
 }

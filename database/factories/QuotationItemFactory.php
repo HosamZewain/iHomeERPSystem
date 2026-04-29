@@ -21,6 +21,7 @@ class QuotationItemFactory extends Factory
         return [
             'quotation_id' => Quotation::factory(),
             'product_id' => Product::factory(),
+            'sort_order' => fake()->numberBetween(1, 10),
             'quantity' => $quantity,
             'unit_sale_price' => $unitSalePrice,
             'item_discount_type' => Quotation::DISCOUNT_FIXED,

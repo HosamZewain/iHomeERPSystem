@@ -16,6 +16,7 @@
     $showInstallationRow = $invoicePrint['show_installation'] && $invoice->installation_enabled;
     $installationItemName = filled($invoicePrint['installation_item_name'] ?? null) ? $invoicePrint['installation_item_name'] : 'خدمة التركيب';
     $printedItemsCount = $invoice->items->count() + ($showInstallationRow ? 1 : 0);
+    $paymentStatusLabel = $invoice->payment_status->label();
 @endphp
 
 @extends('print.layout')
@@ -62,6 +63,12 @@
             @endif
             @if($invoicePrint['show_status'])
                 <div class="row"><span>الحالة</span><span>{{ $invoice->status->label() }}</span></div>
+            @endif
+            <div class="row"><span>حالة السداد</span><span>{{ $paymentStatusLabel }}</span></div>
+            <div class="row"><span>المدفوع</span><span class="number">{{ \App\Support\Money::format($invoice->paid_amount) }}</span></div>
+            <div class="row"><span>المتبقي</span><span class="number">{{ \App\Support\Money::format($invoice->remaining_amount) }}</span></div>
+            @if($invoice->due_date)
+                <div class="row"><span>تاريخ الاستحقاق</span><span>{{ $invoice->due_date->format('Y-m-d') }}</span></div>
             @endif
             @if($invoicePrint['show_creator'])
                 <div class="row"><span>مسؤول البيع</span><span>{{ $invoice->creator?->name ?: '-' }}</span></div>
@@ -176,6 +183,14 @@
                     <strong class="number">{{ \App\Support\Money::format($invoice->installation_total) }}</strong>
                 </div>
             @endif
+            <div class="row">
+                <span>إجمالي المدفوع</span>
+                <strong class="number">{{ \App\Support\Money::format($invoice->paid_amount) }}</strong>
+            </div>
+            <div class="row">
+                <span>المبلغ المتبقي</span>
+                <strong class="number">{{ \App\Support\Money::format($invoice->remaining_amount) }}</strong>
+            </div>
             @if($invoicePrint['show_gross_total'])
                 <div class="row total">
                     <span>إجمالي فاتورة العميل</span>

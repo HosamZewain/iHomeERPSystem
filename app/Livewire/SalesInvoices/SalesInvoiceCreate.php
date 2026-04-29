@@ -5,6 +5,7 @@ namespace App\Livewire\SalesInvoices;
 use App\Enums\CommissionType;
 use App\Enums\SalesChannel;
 use App\Enums\SalesInvoiceStatus;
+use App\Enums\InvoicePaymentStatus;
 use App\Models\Customer;
 use App\Models\Partner;
 use App\Models\Product;
@@ -18,13 +19,20 @@ class SalesInvoiceCreate extends Component
 {
     public ?SalesInvoice $invoice = null;
     public bool $isEditing = false;
+    public bool $showCreateCustomerForm = false;
     public string $invoice_number = '';
     public string $customer_id = '';
     public string $customerSearch = '';
+    public string $new_customer_name = '';
+    public string $new_customer_phone = '';
+    public string $new_customer_email = '';
+    public string $new_customer_address = '';
+    public string $new_customer_notes = '';
     public array $productSearch = [];
     public string $sales_channel = 'direct';
     public string $partner_id = '';
     public string $invoice_date = '';
+    public string $due_date = '';
     public string $notes = '';
     public string $invoice_discount_type = SalesInvoice::DISCOUNT_FIXED;
     public string $invoice_discount_value = '0';
@@ -53,6 +61,7 @@ class SalesInvoiceCreate extends Component
             $this->sales_channel = $salesInvoice->sales_channel->value;
             $this->partner_id = $salesInvoice->partner_id ? (string) $salesInvoice->partner_id : '';
             $this->invoice_date = $salesInvoice->invoice_date->toDateString();
+            $this->due_date = $salesInvoice->due_date?->toDateString() ?? '';
             $this->notes = $salesInvoice->notes ?? '';
             $this->invoice_discount_type = $salesInvoice->invoice_discount_type;
             $this->invoice_discount_value = (string) $salesInvoice->invoice_discount_value;
@@ -108,6 +117,7 @@ class SalesInvoiceCreate extends Component
                 'exists:partners,id',
             ],
             'invoice_date' => ['required', 'date'],
+            'due_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'invoice_discount_type' => ['required', Rule::in(array_keys(SalesInvoice::discountTypes()))],
             'invoice_discount_value' => ['required', 'numeric', 'min:0', $this->invoice_discount_type === SalesInvoice::DISCOUNT_PERCENTAGE ? 'max:100' : 'max:999999999.99'],
@@ -203,6 +213,7 @@ class SalesInvoiceCreate extends Component
         $customer = Customer::query()->findOrFail($customerId);
         $this->customer_id = (string) $customer->id;
         $this->customerSearch = $this->customerLabel($customer);
+        $this->cancelCreateCustomer();
     }
 
     public function selectProduct(int $index, int $productId): void
@@ -215,6 +226,72 @@ class SalesInvoiceCreate extends Component
         if ((float) ($this->items[$index]['unit_sale_price'] ?? 0) <= 0) {
             $this->items[$index]['unit_sale_price'] = (string) $product->sale_price;
         }
+    }
+
+    public function showCreateCustomer(): void
+    {
+        $this->showCreateCustomerForm = true;
+
+        if ($this->customer_id === '' && filled(trim($this->customerSearch))) {
+            $this->new_customer_name = trim($this->customerSearch);
+        }
+
+        $this->resetValidation([
+            'new_customer_name',
+            'new_customer_phone',
+            'new_customer_email',
+            'new_customer_address',
+            'new_customer_notes',
+        ]);
+    }
+
+    public function cancelCreateCustomer(): void
+    {
+        $this->showCreateCustomerForm = false;
+        $this->reset([
+            'new_customer_name',
+            'new_customer_phone',
+            'new_customer_email',
+            'new_customer_address',
+            'new_customer_notes',
+        ]);
+        $this->resetValidation([
+            'new_customer_name',
+            'new_customer_phone',
+            'new_customer_email',
+            'new_customer_address',
+            'new_customer_notes',
+        ]);
+    }
+
+    public function createCustomer(): void
+    {
+        $data = validator(
+            [
+                'new_customer_name' => $this->new_customer_name,
+                'new_customer_phone' => $this->new_customer_phone,
+                'new_customer_email' => $this->new_customer_email,
+                'new_customer_address' => $this->new_customer_address,
+                'new_customer_notes' => $this->new_customer_notes,
+            ],
+            $this->customerCreationRules(),
+            [],
+            $this->customerCreationAttributes(),
+        )->validate();
+
+        $customer = Customer::create([
+            'name' => $data['new_customer_name'],
+            'phone' => $data['new_customer_phone'],
+            'email' => $data['new_customer_email'] ?: null,
+            'address' => $data['new_customer_address'] ?: null,
+            'notes' => $data['new_customer_notes'] ?: null,
+            'created_by' => auth()->id(),
+        ]);
+
+        $this->customer_id = (string) $customer->id;
+        $this->customerSearch = $this->customerLabel($customer);
+        $this->cancelCreateCustomer();
+        session()->flash('success', 'تم إنشاء العميل واختياره في فاتورة البيع.');
     }
 
     public function save(bool $confirm = false): void
@@ -259,6 +336,7 @@ class SalesInvoiceCreate extends Component
                 'sales_channel' => $data['sales_channel'],
                 'partner_id' => $isPartnerSale ? $data['partner_id'] : null,
                 'invoice_date' => $data['invoice_date'],
+                'due_date' => $data['due_date'] ?: null,
                 'notes' => $data['notes'] ?: null,
                 'subtotal' => $subtotal,
                 'invoice_discount_type' => $data['invoice_discount_type'],
@@ -282,13 +360,16 @@ class SalesInvoiceCreate extends Component
                 'net_revenue_after_partner_commission' => $netRevenue,
                 'total_cost' => 0,
                 'total_profit' => 0,
+                'payment_status' => InvoicePaymentStatus::fromAmounts((float) ($invoice->paid_amount ?? 0), $grossTotal),
+                'paid_amount' => round((float) ($invoice->paid_amount ?? 0), 2),
+                'remaining_amount' => round(max($grossTotal - (float) ($invoice->paid_amount ?? 0), 0), 2),
             ]);
             $invoice->created_by = $invoice->exists ? $invoice->created_by : auth()->id();
             $invoice->save();
 
             $invoice->items()->delete();
 
-            foreach ($data['items'] as $item) {
+            foreach ($data['items'] as $index => $item) {
                 $quantity = (float) $item['quantity'];
                 $unitSalePrice = (float) $item['unit_sale_price'];
                 $discountValue = (float) $item['item_discount_value'];
@@ -297,6 +378,7 @@ class SalesInvoiceCreate extends Component
 
                 $invoice->items()->create([
                     'product_id' => $item['product_id'],
+                    'sort_order' => $index + 1,
                     'quantity' => $quantity,
                     'unit_sale_price' => $unitSalePrice,
                     'item_discount_type' => $item['item_discount_type'],
@@ -454,6 +536,28 @@ class SalesInvoiceCreate extends Component
                 ]);
             }
         }
+    }
+
+    private function customerCreationRules(): array
+    {
+        return [
+            'new_customer_name' => ['required', 'string', 'max:255'],
+            'new_customer_phone' => ['required', 'string', 'max:20'],
+            'new_customer_email' => ['nullable', 'email', 'max:255'],
+            'new_customer_address' => ['nullable', 'string', 'max:1000'],
+            'new_customer_notes' => ['nullable', 'string', 'max:2000'],
+        ];
+    }
+
+    private function customerCreationAttributes(): array
+    {
+        return [
+            'new_customer_name' => 'اسم العميل',
+            'new_customer_phone' => 'رقم الهاتف',
+            'new_customer_email' => 'البريد الإلكتروني',
+            'new_customer_address' => 'العنوان',
+            'new_customer_notes' => 'الملاحظات',
+        ];
     }
 
     public function render()

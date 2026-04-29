@@ -13,6 +13,7 @@ class SalesInvoiceItem extends Model
     protected $fillable = [
         'sales_invoice_id',
         'product_id',
+        'sort_order',
         'quantity',
         'unit_sale_price',
         'item_discount_type',
@@ -26,6 +27,7 @@ class SalesInvoiceItem extends Model
     protected function casts(): array
     {
         return [
+            'sort_order' => 'integer',
             'quantity' => 'decimal:2',
             'unit_sale_price' => 'decimal:2',
             'item_discount_value' => 'decimal:2',

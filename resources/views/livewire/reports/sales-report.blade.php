@@ -1,29 +1,48 @@
 <div class="space-y-6">
-    <x-card title="فلاتر التقرير">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <x-select label="نوع الفترة" wire:model.live="reportMode">
-                <option value="month">تقرير شهري</option>
-                <option value="range">نطاق تاريخ</option>
-            </x-select>
+    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700">نوع الفترة</label>
+                    <select wire:model.live="reportMode"
+                            class="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
+                        <option value="month">تقرير شهري</option>
+                        <option value="range">نطاق تاريخ</option>
+                    </select>
+                </div>
 
-            @if($reportMode === 'month')
-                <x-input label="الشهر" wire:model.live="selectedMonth" type="month" />
-            @else
-                <x-input label="من تاريخ" wire:model.live="startDate" type="date" />
-                <x-input label="إلى تاريخ" wire:model.live="endDate" type="date" />
-            @endif
-
-            <div class="md:pt-6">
-                <x-button wire:click="applyCurrentMonth" type="button" variant="secondary" class="w-full">
-                    الشهر الحالي
-                </x-button>
+                @if($reportMode === 'month')
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700">الشهر</label>
+                        <input wire:model.live="selectedMonth"
+                               type="month"
+                               class="block h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
+                    </div>
+                @else
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700">من تاريخ</label>
+                        <input wire:model.live="startDate"
+                               type="date"
+                               class="block h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700">إلى تاريخ</label>
+                        <input wire:model.live="endDate"
+                               type="date"
+                               class="block h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
+                    </div>
+                @endif
             </div>
+
+            <x-button wire:click="applyCurrentMonth" type="button" variant="secondary" class="w-full xl:w-auto xl:min-w-[10rem]">
+                الشهر الحالي
+            </x-button>
         </div>
 
         <p class="mt-4 text-sm text-gray-500">
             الفترة المعروضة: {{ $periodStart }} إلى {{ $periodEnd }}. يعتمد التقرير على فواتير البيع المؤكدة فقط.
         </p>
-    </x-card>
+    </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         <x-stat-card label="إجمالي المبيعات" :value="\App\Support\Money::format($totals['grossSales'])" icon="receipt" color="green" />

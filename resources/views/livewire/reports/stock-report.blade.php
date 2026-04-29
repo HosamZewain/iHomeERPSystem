@@ -9,58 +9,78 @@
         <x-stat-card label="منتجات برصيد سالب" :value="number_format($summary['negative_stock_count'])" icon="exclamation-triangle" color="red" />
     </div>
 
-    <x-card title="فلاتر تقرير المخزون">
-        <div class="grid grid-cols-1 lg:grid-cols-5 xl:grid-cols-7 gap-3">
-            <div class="lg:col-span-2">
-                <input wire:model.live.debounce.300ms="search"
-                       type="text"
-                       placeholder="ابحث باسم المنتج أو SKU أو الباركود..."
-                       class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm py-2.5 px-3 border">
+    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+            <div class="min-w-0">
+                <label for="stock-report-search" class="mb-2 block text-sm font-medium text-gray-700">بحث تقرير المخزون</label>
+                <div class="relative">
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
+                        <x-icon name="magnifying-glass" class="h-5 w-5" />
+                    </div>
+                    <input id="stock-report-search"
+                           wire:model.live.debounce.300ms="search"
+                           type="search"
+                           placeholder="ابحث باسم المنتج أو SKU أو الباركود..."
+                           class="block h-12 w-full rounded-lg border border-gray-300 bg-white py-3 pr-11 pl-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
+                </div>
             </div>
 
-            <select wire:model.live="categoryFilter"
-                    class="rounded-lg border-gray-300 shadow-sm text-sm py-2.5 px-3 border">
-                <option value="">كل التصنيفات</option>
-                @foreach($categories as $category)
-                    <option value="{{ $category->id }}">{{ $category->name }}</option>
-                @endforeach
-            </select>
-
-            <select wire:model.live="stockFilter"
-                    class="rounded-lg border-gray-300 shadow-sm text-sm py-2.5 px-3 border">
-                <option value="">كل حالات المخزون</option>
-                <option value="in_stock">به مخزون</option>
-                <option value="low">منخفض</option>
-                <option value="zero">رصيد صفر</option>
-                <option value="negative">رصيد سالب</option>
-            </select>
-
-            <select wire:model.live="activeFilter"
-                    class="rounded-lg border-gray-300 shadow-sm text-sm py-2.5 px-3 border">
-                <option value="">كل حالات المنتج</option>
-                <option value="active">نشط</option>
-                <option value="inactive">غير نشط</option>
-            </select>
-
-            <select wire:model.live="sortField"
-                    class="rounded-lg border-gray-300 shadow-sm text-sm py-2.5 px-3 border">
-                @foreach($sortableFields as $field => $label)
-                    <option value="{{ $field }}">ترتيب: {{ $label }}</option>
-                @endforeach
-            </select>
-
-            <select wire:model.live="sortDirection"
-                    class="rounded-lg border-gray-300 shadow-sm text-sm py-2.5 px-3 border">
-                <option value="asc">تصاعدي</option>
-                <option value="desc">تنازلي</option>
-            </select>
+            <x-button wire:click="resetFilters" type="button" variant="secondary" class="w-full xl:w-auto xl:min-w-[10rem]">
+                إعادة ضبط الفلاتر
+            </x-button>
         </div>
 
-        <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <p class="text-sm text-gray-500">القيم محسوبة من حركات المخزون الحالية ومتوسط تكلفة/سعر بيع المنتج الحالي.</p>
-            <x-button wire:click="resetFilters" type="button" variant="secondary" class="w-full sm:w-auto">إعادة ضبط الفلاتر</x-button>
+        <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div>
+                <select wire:model.live="categoryFilter"
+                        class="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
+                    <option value="">كل التصنيفات</option>
+                    @foreach($categories as $category)
+                        <option value="{{ $category->id }}">{{ $category->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <select wire:model.live="stockFilter"
+                        class="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
+                    <option value="">كل حالات المخزون</option>
+                    <option value="in_stock">به مخزون</option>
+                    <option value="low">منخفض</option>
+                    <option value="zero">رصيد صفر</option>
+                    <option value="negative">رصيد سالب</option>
+                </select>
+            </div>
+
+            <div>
+                <select wire:model.live="activeFilter"
+                        class="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
+                    <option value="">كل حالات المنتج</option>
+                    <option value="active">نشط</option>
+                    <option value="inactive">غير نشط</option>
+                </select>
+            </div>
+
+            <div>
+                <select wire:model.live="sortField"
+                        class="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
+                    @foreach($sortableFields as $field => $label)
+                        <option value="{{ $field }}">ترتيب: {{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <select wire:model.live="sortDirection"
+                        class="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
+                    <option value="asc">تصاعدي</option>
+                    <option value="desc">تنازلي</option>
+                </select>
+            </div>
         </div>
-    </x-card>
+
+        <p class="mt-4 text-sm text-gray-500">القيم محسوبة من حركات المخزون الحالية ومتوسط تكلفة/سعر بيع المنتج الحالي.</p>
+    </div>
 
     <x-card title="منتجات منخفضة المخزون" :padding="false">
         <div class="divide-y divide-gray-200">

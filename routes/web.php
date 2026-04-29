@@ -21,6 +21,7 @@ use App\Livewire\SalesInvoices\SalesInvoiceList;
 use App\Livewire\SalesInvoices\SalesInvoiceShow;
 use App\Livewire\Settings\PrintTemplates\PrintTemplateForm;
 use App\Livewire\Settings\PrintTemplates\PrintTemplateList;
+use App\Livewire\Settings\DatabaseBackups\DatabaseBackupList;
 use App\Livewire\Stock\ProductMovementHistory;
 use App\Livewire\Stock\StockSummary;
 use App\Livewire\Suppliers\SupplierList;
@@ -29,8 +30,10 @@ use App\Livewire\Users\UserCreate;
 use App\Livewire\Users\UserEdit;
 use App\Livewire\Users\UserList;
 use App\Models\PrintTemplate;
+use App\Models\DatabaseBackup;
 use App\Models\Quotation;
 use App\Models\SalesInvoice;
+use App\Models\SalesInvoicePayment;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -133,6 +136,34 @@ Route::middleware(['auth', 'active'])->group(function () {
                 'discountTypes' => SalesInvoice::discountTypes(),
             ]);
         })->name('sales-invoices.print');
+        Route::get('/sales-invoices/{salesInvoice}/payments/{salesInvoicePayment}/print', function (SalesInvoice $salesInvoice, SalesInvoicePayment $salesInvoicePayment) {
+            abort_unless($salesInvoicePayment->sales_invoice_id === $salesInvoice->id, 404);
+
+            $salesInvoice->load(['customer', 'creator', 'quotation']);
+            $salesInvoicePayment->load(['creator', 'receiver']);
+            $selectedTemplate = PrintTemplate::resolveForDocument(PrintTemplate::TYPE_SALES_INVOICE, request()->integer('template') ?: null);
+            $availableTemplates = PrintTemplate::query()
+                ->forDocumentType(PrintTemplate::TYPE_SALES_INVOICE)
+                ->active()
+                ->orderByDesc('is_default')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get();
+            $printSettings = $selectedTemplate->resolvedSettings();
+            data_set($printSettings, 'warranty.enabled', false);
+
+            return view('sales-invoices.payment-receipt-print', [
+                'invoice' => $salesInvoice,
+                'payment' => $salesInvoicePayment,
+                'selectedTemplate' => $selectedTemplate,
+                'availableTemplates' => $availableTemplates,
+                'printSettings' => $printSettings,
+                'documentTitle' => 'إيصال استلام',
+                'htmlTitle' => 'إيصال استلام '.$salesInvoicePayment->receipt_number,
+                'backRoute' => route('sales-invoices.show', $salesInvoice),
+                'documentFooterText' => 'هذا الإيصال يثبت استلام المبلغ الموضح أعلاه من العميل.',
+            ]);
+        })->name('sales-invoices.payments.print');
         Route::get('/sales-invoices/{salesInvoice}/partner-settlement/print', function (SalesInvoice $salesInvoice) {
             abort_unless($salesInvoice->sales_channel === SalesChannel::Partner && $salesInvoice->partner_id, 404);
 
@@ -171,6 +202,15 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/users/create', UserCreate::class)->name('users.create');
         Route::get('/users/{user}/edit', UserEdit::class)->name('users.edit');
         Route::get('/users/roles', RoleList::class)->name('users.roles');
+        Route::get('/settings/backups', DatabaseBackupList::class)->name('settings.backups');
+        Route::get('/settings/backups/{databaseBackup}/download', function (DatabaseBackup $databaseBackup) {
+            abort_unless(\Illuminate\Support\Facades\Storage::disk(\App\Support\DatabaseBackupManager::STORAGE_DISK)->exists($databaseBackup->file_path), 404);
+
+            return response()->download(
+                \Illuminate\Support\Facades\Storage::disk(\App\Support\DatabaseBackupManager::STORAGE_DISK)->path($databaseBackup->file_path),
+                $databaseBackup->original_file_name ?: $databaseBackup->file_name,
+            );
+        })->name('settings.backups.download');
     });
 
     Route::middleware('permission:settings.manage')->group(function () {

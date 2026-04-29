@@ -7,41 +7,54 @@
         <x-stat-card label="منتجات منخفضة" value="{{ number_format($summary['low_stock_count']) }}" icon="exclamation-triangle" color="red" />
     </div>
 
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-6">
-        <div class="flex flex-col lg:flex-row gap-3 flex-1">
-            <div class="flex-1 max-w-md">
-                <input wire:model.live.debounce.300ms="search"
-                       type="text"
+    <div class="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div class="min-w-0">
+            <label for="stock-summary-search" class="mb-2 block text-sm font-medium text-gray-700">بحث المخزون</label>
+            <div class="relative">
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
+                    <x-icon name="magnifying-glass" class="h-5 w-5" />
+                </div>
+                <input id="stock-summary-search"
+                       wire:model.live.debounce.300ms="search"
+                       type="search"
                        placeholder="ابحث باسم المنتج أو SKU أو الباركود..."
-                       class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm py-2.5 px-3 border">
+                       class="block h-12 w-full rounded-lg border border-gray-300 bg-white py-3 pr-11 pl-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
             </div>
+        </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+        <div class="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div>
                 <select wire:model.live="categoryFilter"
-                        class="rounded-lg border-gray-300 shadow-sm text-sm py-2.5 px-3 border">
+                        class="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
                     <option value="">كل التصنيفات</option>
                     @foreach($categories as $category)
                         <option value="{{ $category->id }}">{{ $category->name }}</option>
                     @endforeach
                 </select>
+            </div>
 
+            <div>
                 <select wire:model.live="stockFilter"
-                        class="rounded-lg border-gray-300 shadow-sm text-sm py-2.5 px-3 border">
+                        class="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
                     <option value="">كل حالات المخزون</option>
                     <option value="in_stock">به مخزون</option>
                     <option value="low">منخفض</option>
                     <option value="zero">رصيد صفر</option>
                 </select>
+            </div>
 
+            <div>
                 <select wire:model.live="sortField"
-                        class="rounded-lg border-gray-300 shadow-sm text-sm py-2.5 px-3 border">
+                        class="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
                     @foreach($sortableFields as $field => $label)
                         <option value="{{ $field }}">ترتيب: {{ $label }}</option>
                     @endforeach
                 </select>
+            </div>
 
+            <div>
                 <select wire:model.live="sortDirection"
-                        class="rounded-lg border-gray-300 shadow-sm text-sm py-2.5 px-3 border">
+                        class="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
                     <option value="asc">تصاعدي</option>
                     <option value="desc">تنازلي</option>
                 </select>

@@ -1,6 +1,6 @@
-@props(['title' => null, 'padding' => true])
+@props(['title' => null, 'padding' => true, 'allowOverflow' => false])
 
-<div {{ $attributes->merge(['class' => 'bg-white rounded-xl border border-gray-200 overflow-hidden']) }}>
+<div {{ $attributes->merge(['class' => 'bg-white rounded-xl border border-gray-200 '.($allowOverflow ? 'overflow-visible' : 'overflow-hidden')]) }}>
     @if($title)
         <div class="border-b border-gray-200 px-4 py-3 sm:px-6">
             <h3 class="text-base font-semibold text-gray-900">{{ $title }}</h3>

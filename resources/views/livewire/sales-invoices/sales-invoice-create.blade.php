@@ -16,12 +16,19 @@
     @endif
 
     <form wire:submit="saveDraft" class="space-y-6">
-        <x-card title="بيانات الفاتورة">
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <x-card title="بيانات الفاتورة" :allow-overflow="true">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
                 <x-input label="رقم الفاتورة" wire:model="invoice_number" type="text" required :error="$errors->first('invoice_number')" />
 
-                <div class="relative">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">العميل</label>
+                <div class="relative md:col-span-2 xl:col-span-2">
+                    <div class="mb-1 flex items-center justify-between gap-3">
+                        <label class="block text-sm font-medium text-gray-700">العميل</label>
+                        <button type="button"
+                                wire:click="{{ $showCreateCustomerForm ? 'cancelCreateCustomer' : 'showCreateCustomer' }}"
+                                class="text-sm font-medium text-primary-600 hover:text-primary-800">
+                            {{ $showCreateCustomerForm ? 'إغلاق نموذج العميل' : 'إضافة عميل جديد' }}
+                        </button>
+                    </div>
                     <input type="hidden" wire:model="customer_id">
                     <input wire:model.live.debounce.300ms="customerSearch"
                            type="search"
@@ -40,8 +47,38 @@
                                     <span class="block text-xs text-gray-500">{{ $customer->phone ?: '-' }}</span>
                                 </button>
                             @empty
-                                <div class="px-3 py-2 text-sm text-gray-500">لا توجد نتائج مطابقة. اترك الحقل فارغًا للعميل النقدي.</div>
+                                <div class="px-3 py-2 text-sm text-gray-500">لا توجد نتائج مطابقة. اترك الحقل فارغًا للعميل النقدي أو أضف عميلًا جديدًا من نفس الشاشة.</div>
                             @endforelse
+                        </div>
+                    @endif
+
+                    @if($showCreateCustomerForm)
+                        <div class="mt-3 rounded-lg border border-primary-100 bg-primary-50/40 p-4">
+                            <div class="mb-3">
+                                <h3 class="text-sm font-semibold text-gray-900">إضافة عميل جديد</h3>
+                                <p class="text-xs text-gray-500">بعد الحفظ سيتم اختيار العميل مباشرة في فاتورة البيع.</p>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <x-input label="اسم العميل" wire:model="new_customer_name" type="text" required :error="$errors->first('new_customer_name')" />
+                                <x-input label="رقم الهاتف" wire:model="new_customer_phone" type="text" required :error="$errors->first('new_customer_phone')" />
+                                <x-input label="البريد الإلكتروني" wire:model="new_customer_email" type="email" :error="$errors->first('new_customer_email')" />
+                                <x-input label="العنوان" wire:model="new_customer_address" type="text" :error="$errors->first('new_customer_address')" />
+                            </div>
+
+                            <div class="mt-3">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">ملاحظات العميل</label>
+                                <textarea wire:model="new_customer_notes" rows="3"
+                                          class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm py-2.5 px-3 border"></textarea>
+                                @if($errors->has('new_customer_notes'))
+                                    <p class="mt-1 text-xs text-red-600">{{ $errors->first('new_customer_notes') }}</p>
+                                @endif
+                            </div>
+
+                            <div class="mt-4 flex flex-col sm:flex-row sm:justify-end gap-3">
+                                <x-button wire:click="cancelCreateCustomer" type="button" variant="secondary" class="w-full sm:w-auto">إلغاء</x-button>
+                                <x-button wire:click="createCustomer" type="button" class="w-full sm:w-auto">حفظ العميل واختياره</x-button>
+                            </div>
                         </div>
                     @endif
                 </div>
@@ -53,6 +90,8 @@
                         <option value="{{ $channel->value }}">{{ $channel->label() }}</option>
                     @endforeach
                 </x-select>
+
+                <x-input label="تاريخ الاستحقاق" wire:model="due_date" type="date" :error="$errors->first('due_date')" />
             </div>
 
             @if($sales_channel === 'partner')
@@ -86,7 +125,7 @@
             </div>
         </x-card>
 
-        <x-card title="البنود والخصومات">
+        <x-card title="البنود والخصومات" :allow-overflow="true">
             <div class="hidden xl:block">
                 <div class="grid grid-cols-12 gap-3 px-1 pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <div class="col-span-3">المنتج</div>

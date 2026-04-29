@@ -22,7 +22,10 @@
                         <h2 class="text-xl font-semibold text-gray-900">{{ $invoice->invoice_number }}</h2>
                         <p class="mt-1 text-sm text-gray-500">{{ $invoice->customer?->name ?: 'عميل نقدي' }}</p>
                     </div>
-                    <x-badge :color="$invoice->status->color()">{{ $invoice->status->label() }}</x-badge>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <x-badge :color="$invoice->status->color()">{{ $invoice->status->label() }}</x-badge>
+                        <x-badge :color="$invoice->payment_status->color()">{{ $invoice->payment_status->label() }}</x-badge>
+                    </div>
                 </div>
 
                 <dl class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -35,8 +38,16 @@
                         <dd class="mt-1 text-sm text-gray-900">{{ \App\Support\Money::format($invoice->gross_total) }}</dd>
                     </div>
                     <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">حالة السداد</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ $invoice->payment_status->label() }}</dd>
+                    </div>
+                    <div>
                         <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">قناة البيع</dt>
                         <dd class="mt-1 text-sm text-gray-900">{{ $invoice->sales_channel->label() }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">تاريخ الاستحقاق</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ $invoice->due_date?->format('Y-m-d') ?: '-' }}</dd>
                     </div>
                     <div>
                         <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">الشريك</dt>
@@ -64,12 +75,31 @@
                             {{ $invoice->confirmed_at ? $invoice->confirmed_at->format('Y-m-d H:i') : '-' }}
                         </dd>
                     </div>
+                    @if($invoice->status->value === 'returned')
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">تاريخ المرتجع</dt>
+                            <dd class="mt-1 text-sm text-gray-900">
+                                {{ $invoice->returned_at ? $invoice->returned_at->format('Y-m-d H:i') : '-' }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">نفذ المرتجع</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ $invoice->returner?->name ?: '-' }}</dd>
+                        </div>
+                    @endif
                 </dl>
 
                 @if($invoice->notes)
                     <div class="mt-6 border-t border-gray-200 pt-4">
                         <h3 class="text-sm font-medium text-gray-900">ملاحظات</h3>
                         <p class="mt-2 text-sm text-gray-600 whitespace-pre-line">{{ $invoice->notes }}</p>
+                    </div>
+                @endif
+
+                @if($invoice->status->value === 'returned' && $invoice->return_reason)
+                    <div class="mt-6 border-t border-amber-200 pt-4">
+                        <h3 class="text-sm font-medium text-gray-900">سبب المرتجع</h3>
+                        <p class="mt-2 text-sm text-amber-800 whitespace-pre-line">{{ $invoice->return_reason }}</p>
                     </div>
                 @endif
             </x-card>
@@ -202,7 +232,7 @@
                                     <p class="text-xs text-gray-400">أنشأها: {{ $movement->creator?->name ?: '-' }}</p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-sm font-semibold text-red-700">{{ number_format((float) $movement->quantity, 2) }}</p>
+                                    <p class="text-sm font-semibold {{ $movement->isIncrease() ? 'text-green-700' : 'text-red-700' }}">{{ number_format((float) $movement->quantity, 2) }}</p>
                                     <p class="text-xs text-gray-500">{{ \App\Support\Money::format($movement->unit_cost) }}</p>
                                     <p class="text-xs text-gray-400">الرصيد: {{ $movement->balance_after !== null ? number_format((float) $movement->balance_after, 2) : '-' }}</p>
                                 </div>
@@ -238,7 +268,135 @@
                         <dt class="text-sm font-medium text-gray-900">إجمالي فاتورة العميل</dt>
                         <dd class="text-lg font-semibold text-gray-900">{{ \App\Support\Money::format($invoice->gross_total) }}</dd>
                     </div>
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-gray-500">المدفوع</dt>
+                        <dd class="text-sm font-medium text-green-700">{{ \App\Support\Money::format($invoice->paid_amount) }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-gray-500">المتبقي</dt>
+                        <dd class="text-sm font-medium {{ (float) $invoice->remaining_amount > 0 ? 'text-red-700' : 'text-gray-900' }}">{{ \App\Support\Money::format($invoice->remaining_amount) }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-gray-500">حالة السداد</dt>
+                        <dd><x-badge :color="$invoice->payment_status->color()">{{ $invoice->payment_status->label() }}</x-badge></dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-gray-500">تاريخ الاستحقاق</dt>
+                        <dd class="text-sm font-medium text-gray-900">{{ $invoice->due_date?->format('Y-m-d') ?: '-' }}</dd>
+                    </div>
                 </dl>
+            </x-card>
+
+            <x-card title="الدفعات والتحصيل">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                        <p class="text-xs text-gray-500">إجمالي الفاتورة</p>
+                        <p class="mt-1 text-lg font-semibold text-gray-900">{{ \App\Support\Money::format($invoice->gross_total) }}</p>
+                    </div>
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                        <p class="text-xs text-gray-500">إجمالي المدفوع</p>
+                        <p class="mt-1 text-lg font-semibold text-green-700">{{ \App\Support\Money::format($invoice->paid_amount) }}</p>
+                    </div>
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                        <p class="text-xs text-gray-500">المتبقي</p>
+                        <p class="mt-1 text-lg font-semibold {{ (float) $invoice->remaining_amount > 0 ? 'text-red-700' : 'text-gray-900' }}">{{ \App\Support\Money::format($invoice->remaining_amount) }}</p>
+                    </div>
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                        <p class="text-xs text-gray-500">حالة السداد</p>
+                        <div class="mt-2"><x-badge :color="$invoice->payment_status->color()">{{ $invoice->payment_status->label() }}</x-badge></div>
+                    </div>
+                </dl>
+
+                @if($invoice->payments->isNotEmpty())
+                    <div class="mt-6 border-t border-gray-200 pt-4">
+                        <h3 class="text-sm font-semibold text-gray-900">سجل الدفعات</h3>
+                        <div class="mt-3 space-y-3">
+                            @foreach($invoice->payments as $payment)
+                                <div class="rounded-lg border border-gray-200 p-4">
+                                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-gray-900">{{ $payment->receipt_number }}</p>
+                                            <p class="text-xs text-gray-500">{{ $payment->payment_date->format('Y-m-d') }} - {{ $payment->payment_method->label() }}</p>
+                                            <p class="text-xs text-gray-500">سجلها: {{ $payment->creator?->name ?: '-' }}</p>
+                                            @if($payment->reference_number)
+                                                <p class="text-xs text-gray-500">المرجع: {{ $payment->reference_number }}</p>
+                                            @endif
+                                            @if($payment->notes)
+                                                <p class="mt-2 text-sm text-gray-600 whitespace-pre-line">{{ $payment->notes }}</p>
+                                            @endif
+                                        </div>
+                                        <div class="sm:text-left">
+                                            <p class="text-lg font-semibold text-gray-900">{{ \App\Support\Money::format($payment->amount) }}</p>
+                                            <p class="text-xs text-gray-500">المتبقي بعد الدفعة: {{ \App\Support\Money::format($payment->remaining_amount_after) }}</p>
+                                            <a href="{{ route('sales-invoices.payments.print', [$invoice, $payment]) }}" target="_blank"
+                                               class="mt-3 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                                طباعة إيصال الاستلام
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @else
+                    <div class="mt-6 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-center text-sm text-gray-500">
+                        لم يتم تسجيل أي دفعات على هذه الفاتورة حتى الآن.
+                    </div>
+                @endif
+
+                @if($invoice->canReceivePayments())
+                    <div class="mt-6 border-t border-gray-200 pt-4">
+                        <div class="mb-3 flex items-center justify-between gap-3">
+                            <div>
+                                <h3 class="text-sm font-semibold text-gray-900">إضافة دفعة</h3>
+                                <p class="text-xs text-gray-500">الفاتورة تبقى واحدة، ويمكن تسجيل أكثر من دفعة حتى السداد الكامل.</p>
+                            </div>
+                            <x-button wire:click="fillRemainingAmount" type="button" variant="secondary" class="w-full sm:w-auto">
+                                تعبئة المتبقي بالكامل
+                            </x-button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <x-input label="تاريخ الدفعة" wire:model="payment_date" type="date" required :error="$errors->first('payment_date')" />
+                            <x-input label="قيمة الدفعة" wire:model="payment_amount" type="number" step="0.01" min="0.01" required :error="$errors->first('payment_amount')" />
+
+                            <x-select label="طريقة الدفع" wire:model="payment_method" required :error="$errors->first('payment_method')">
+                                @foreach($paymentMethods as $method => $label)
+                                    <option value="{{ $method }}">{{ $label }}</option>
+                                @endforeach
+                            </x-select>
+
+                            <x-input label="رقم المرجع" wire:model="reference_number" type="text" :error="$errors->first('reference_number')" />
+                        </div>
+
+                        <div class="mt-4">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">ملاحظات الدفعة</label>
+                            <textarea wire:model="payment_notes" rows="3"
+                                      class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+                            @if($errors->has('payment_notes'))
+                                <p class="mt-1 text-xs text-red-600">{{ $errors->first('payment_notes') }}</p>
+                            @endif
+                        </div>
+
+                        <div class="mt-4 flex flex-col sm:flex-row sm:justify-end gap-3">
+                            <x-button wire:click="savePayment" type="button" class="w-full sm:w-auto">
+                                حفظ الدفعة
+                            </x-button>
+                        </div>
+                    </div>
+                @elseif($invoice->status->value === 'confirmed')
+                    <div class="mt-6 rounded-lg border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-800">
+                        هذه الفاتورة مسددة بالكامل، ولا توجد مبالغ متبقية للتحصيل.
+                    </div>
+                @elseif($invoice->status->value === 'returned')
+                    <div class="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+                        تم تنفيذ مرتجع كامل لهذه الفاتورة. لا يمكن تسجيل دفعات عليها بعد تنفيذ المرتجع.
+                    </div>
+                @else
+                    <div class="mt-6 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-4 text-sm text-yellow-800">
+                        يمكن تسجيل الدفعات بعد تأكيد فاتورة البيع فقط. تسجيل الدفعات لا يؤثر على المخزون.
+                    </div>
+                @endif
             </x-card>
 
             <x-card title="الشريك والربحية">
@@ -314,8 +472,48 @@
                         </x-button>
                     @endif
 
-                    @if($invoice->status->value === 'confirmed')
-                        <x-alert type="info" message="فاتورة البيع المؤكدة مقفلة. استخدم مرتجع بيع أو تسوية مخزون إذا احتاج المخزون إلى تصحيح." />
+                    @if($invoice->canReverseConfirmed())
+                        @if($showReturnForm)
+                            <div class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
+                                <h3 class="font-semibold text-amber-900">تنفيذ مرتجع كامل لفاتورة مؤكدة</h3>
+                                <p class="mt-2 text-amber-800">
+                                    هذا الإجراء سيُرجع كل الكميات إلى المخزون ويغيّر حالة الفاتورة إلى مرتجع. لا يمكن التراجع عنه من هذه الشاشة.
+                                </p>
+
+                                <div class="mt-4">
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">سبب المرتجع</label>
+                                    <textarea wire:model="return_reason" rows="3"
+                                              class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+                                    @if($errors->has('return_reason'))
+                                        <p class="mt-1 text-xs text-red-600">{{ $errors->first('return_reason') }}</p>
+                                    @endif
+                                </div>
+
+                                <div class="mt-4">
+                                    <x-input label='اكتب "مرتجع" للتأكيد' wire:model="return_confirmation" type="text" :error="$errors->first('return_confirmation')" />
+                                </div>
+
+                                <div class="mt-4 flex flex-col sm:flex-row gap-3">
+                                    <x-button wire:click="reverseConfirmed" type="button" variant="danger" class="w-full sm:w-auto">
+                                        تنفيذ المرتجع الكامل
+                                    </x-button>
+                                    <x-button wire:click="cancelReturn" type="button" variant="secondary" class="w-full sm:w-auto">
+                                        إلغاء
+                                    </x-button>
+                                </div>
+                            </div>
+                        @else
+                            <x-button wire:click="startReturn"
+                                      type="button"
+                                      variant="danger"
+                                      class="w-full">
+                                تنفيذ مرتجع كامل
+                            </x-button>
+                        @endif
+                    @elseif($invoice->status->value === 'confirmed')
+                        <x-alert type="info" message="فاتورة البيع المؤكدة مقفلة. لا يمكن إلغاؤها مباشرة. يمكن تنفيذ مرتجع كامل فقط إذا لم تُسجل عليها أي دفعات." />
+                    @elseif($invoice->status->value === 'returned')
+                        <x-alert type="info" message="تم تنفيذ مرتجع كامل لهذه الفاتورة، وتمت إعادة الكميات إلى المخزون." />
                     @endif
                 </div>
             </x-card>

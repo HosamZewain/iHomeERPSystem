@@ -15,9 +15,15 @@ class QuotationForm extends Component
 {
     public ?Quotation $quotation = null;
     public bool $isEditing = false;
+    public bool $showCreateCustomerForm = false;
     public string $quotation_number = '';
     public string $customer_id = '';
     public string $customerSearch = '';
+    public string $new_customer_name = '';
+    public string $new_customer_phone = '';
+    public string $new_customer_email = '';
+    public string $new_customer_address = '';
+    public string $new_customer_notes = '';
     public array $productSearch = [];
     public string $quotation_date = '';
     public string $notes = '';
@@ -156,6 +162,7 @@ class QuotationForm extends Component
         $customer = Customer::query()->findOrFail($customerId);
         $this->customer_id = (string) $customer->id;
         $this->customerSearch = $this->customerLabel($customer);
+        $this->cancelCreateCustomer();
     }
 
     public function selectProduct(int $index, int $productId): void
@@ -168,6 +175,72 @@ class QuotationForm extends Component
         if ((float) ($this->items[$index]['unit_sale_price'] ?? 0) <= 0) {
             $this->items[$index]['unit_sale_price'] = (string) $product->sale_price;
         }
+    }
+
+    public function showCreateCustomer(): void
+    {
+        $this->showCreateCustomerForm = true;
+
+        if ($this->customer_id === '' && filled(trim($this->customerSearch))) {
+            $this->new_customer_name = trim($this->customerSearch);
+        }
+
+        $this->resetValidation([
+            'new_customer_name',
+            'new_customer_phone',
+            'new_customer_email',
+            'new_customer_address',
+            'new_customer_notes',
+        ]);
+    }
+
+    public function cancelCreateCustomer(): void
+    {
+        $this->showCreateCustomerForm = false;
+        $this->reset([
+            'new_customer_name',
+            'new_customer_phone',
+            'new_customer_email',
+            'new_customer_address',
+            'new_customer_notes',
+        ]);
+        $this->resetValidation([
+            'new_customer_name',
+            'new_customer_phone',
+            'new_customer_email',
+            'new_customer_address',
+            'new_customer_notes',
+        ]);
+    }
+
+    public function createCustomer(): void
+    {
+        $data = validator(
+            [
+                'new_customer_name' => $this->new_customer_name,
+                'new_customer_phone' => $this->new_customer_phone,
+                'new_customer_email' => $this->new_customer_email,
+                'new_customer_address' => $this->new_customer_address,
+                'new_customer_notes' => $this->new_customer_notes,
+            ],
+            $this->customerCreationRules(),
+            [],
+            $this->customerCreationAttributes(),
+        )->validate();
+
+        $customer = Customer::create([
+            'name' => $data['new_customer_name'],
+            'phone' => $data['new_customer_phone'],
+            'email' => $data['new_customer_email'] ?: null,
+            'address' => $data['new_customer_address'] ?: null,
+            'notes' => $data['new_customer_notes'] ?: null,
+            'created_by' => auth()->id(),
+        ]);
+
+        $this->customer_id = (string) $customer->id;
+        $this->customerSearch = $this->customerLabel($customer);
+        $this->cancelCreateCustomer();
+        session()->flash('success', 'تم إنشاء العميل واختياره في عرض السعر.');
     }
 
     public function save(): void
@@ -212,7 +285,7 @@ class QuotationForm extends Component
 
             $quotation->items()->delete();
 
-            foreach ($data['items'] as $item) {
+            foreach ($data['items'] as $index => $item) {
                 $quantity = (float) $item['quantity'];
                 $unitSalePrice = (float) $item['unit_sale_price'];
                 $discountValue = (float) $item['item_discount_value'];
@@ -221,6 +294,7 @@ class QuotationForm extends Component
 
                 $quotation->items()->create([
                     'product_id' => $item['product_id'],
+                    'sort_order' => $index + 1,
                     'quantity' => $quantity,
                     'unit_sale_price' => $unitSalePrice,
                     'item_discount_type' => $item['item_discount_type'],
@@ -312,6 +386,28 @@ class QuotationForm extends Component
                 'items' => 'استخدم كل منتج مرة واحدة في عرض السعر. زِد الكمية في السطر الموجود بدلًا من تكرار المنتج.',
             ]);
         }
+    }
+
+    private function customerCreationRules(): array
+    {
+        return [
+            'new_customer_name' => ['required', 'string', 'max:255'],
+            'new_customer_phone' => ['required', 'string', 'max:20'],
+            'new_customer_email' => ['nullable', 'email', 'max:255'],
+            'new_customer_address' => ['nullable', 'string', 'max:1000'],
+            'new_customer_notes' => ['nullable', 'string', 'max:2000'],
+        ];
+    }
+
+    private function customerCreationAttributes(): array
+    {
+        return [
+            'new_customer_name' => 'اسم العميل',
+            'new_customer_phone' => 'رقم الهاتف',
+            'new_customer_email' => 'البريد الإلكتروني',
+            'new_customer_address' => 'العنوان',
+            'new_customer_notes' => 'الملاحظات',
+        ];
     }
 
     public function render()

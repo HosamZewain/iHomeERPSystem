@@ -28,11 +28,17 @@ return [
         'draft' => 'مسودة',
         'confirmed' => 'مؤكد',
         'cancelled' => 'ملغي',
+        'returned' => 'مرتجع',
         'sent' => 'مرسل',
         'approved' => 'مقبول',
         'rejected' => 'مرفوض',
         'expired' => 'منتهي',
         'converted' => 'محول',
+    ],
+    'payment_status' => [
+        'unpaid' => 'غير مدفوع',
+        'partially_paid' => 'مدفوع جزئيًا',
+        'paid' => 'مدفوع بالكامل',
     ],
     'nav' => [
         'dashboard' => 'لوحة التحكم',
@@ -57,6 +63,7 @@ return [
         'system' => 'النظام',
         'settings' => 'الإعدادات',
         'print_settings' => 'إعدادات الطباعة',
+        'database_backups' => 'النسخ الاحتياطية',
         'users' => 'المستخدمون',
         'soon' => 'قريبًا',
     ],
@@ -90,5 +97,12 @@ return [
     'discount_types' => [
         'percentage' => 'نسبة مئوية (%)',
         'fixed' => 'مبلغ ثابت',
+    ],
+    'payment_methods' => [
+        'cash' => 'نقدي',
+        'bank_transfer' => 'تحويل بنكي',
+        'instapay' => 'إنستاباي',
+        'card' => 'بطاقة',
+        'other' => 'أخرى',
     ],
 ];

@@ -7,6 +7,7 @@ enum SalesInvoiceStatus: string
     case Draft = 'draft';
     case Confirmed = 'confirmed';
     case Cancelled = 'cancelled';
+    case Returned = 'returned';
 
     public function label(): string
     {
@@ -14,6 +15,7 @@ enum SalesInvoiceStatus: string
             self::Draft => __('ui.status.draft'),
             self::Confirmed => __('ui.status.confirmed'),
             self::Cancelled => __('ui.status.cancelled'),
+            self::Returned => __('ui.status.returned'),
         };
     }
 
@@ -23,6 +25,7 @@ enum SalesInvoiceStatus: string
             self::Draft => 'gray',
             self::Confirmed => 'green',
             self::Cancelled => 'red',
+            self::Returned => 'amber',
         };
     }
 }

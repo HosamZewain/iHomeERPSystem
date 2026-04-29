@@ -110,6 +110,8 @@ class SalesInvoiceList extends Component
             'status' => $query->orderBy('status', $direction),
             'items_count' => $query->orderBy('items_count', $direction),
             'gross_total' => $query->orderBy('gross_total', $direction),
+            'created_at' => $query->orderBy('created_at', $direction),
+            'updated_at' => $query->orderBy('updated_at', $direction),
             default => $query->orderBy('invoice_date', $direction),
         };
 
@@ -127,6 +129,8 @@ class SalesInvoiceList extends Component
             'status' => 'الحالة',
             'items_count' => 'البنود',
             'gross_total' => 'إجمالي العميل',
+            'created_at' => 'تاريخ الإنشاء',
+            'updated_at' => 'آخر تحديث',
         ];
     }
 }

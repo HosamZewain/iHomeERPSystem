@@ -69,6 +69,7 @@
     </div>
     @if($user->hasPermission('settings.manage'))
         <x-nav-link route="settings.print" icon="cog" :label="__('ui.nav.print_settings')" />
+        <x-nav-link route="settings.backups" icon="archive" :label="__('ui.nav.database_backups')" />
     @endif
     <x-nav-link route="users.index" icon="user-group" :label="__('ui.nav.users')" />
 @endif

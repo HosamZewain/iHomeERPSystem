@@ -19,6 +19,7 @@ class SalesInvoiceItemFactory extends Factory
         return [
             'sales_invoice_id' => SalesInvoice::factory(),
             'product_id' => Product::factory(),
+            'sort_order' => fake()->numberBetween(1, 10),
             'quantity' => $quantity,
             'unit_sale_price' => $unitPrice,
             'item_discount_type' => SalesInvoice::DISCOUNT_FIXED,

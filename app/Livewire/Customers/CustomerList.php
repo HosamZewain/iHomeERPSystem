@@ -12,6 +12,8 @@ class CustomerList extends Component
 
     public string $search = '';
     public string $contactFilter = '';
+    public string $sortField = 'name';
+    public string $sortDirection = 'asc';
     public bool $showForm = false;
     public ?int $editingId = null;
     public string $name = '';
@@ -38,6 +40,32 @@ class CustomerList extends Component
 
     public function updatingContactFilter(): void
     {
+        $this->resetPage();
+    }
+
+    public function updatingSortField(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSortDirection(): void
+    {
+        $this->resetPage();
+    }
+
+    public function sortBy(string $field): void
+    {
+        if (! array_key_exists($field, $this->sortableFields())) {
+            return;
+        }
+
+        if ($this->sortField === $field) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortField = $field;
+            $this->sortDirection = 'asc';
+        }
+
         $this->resetPage();
     }
 
@@ -123,12 +151,41 @@ class CustomerList extends Component
             ->when($this->contactFilter === 'without_email', fn ($query) => $query->where(function ($query) {
                 $query->whereNull('email')->orWhere('email', '');
             }))
-            ->when($this->contactFilter === 'with_address', fn ($query) => $query->whereNotNull('address')->where('address', '!=', ''))
-            ->orderBy('name')
-            ->paginate(15);
+            ->when($this->contactFilter === 'with_address', fn ($query) => $query->whereNotNull('address')->where('address', '!=', ''));
+
+        $this->applySorting($customers);
+
+        $customers = $customers->paginate(15);
 
         return view('livewire.customers.customer-list', [
             'customers' => $customers,
+            'sortableFields' => $this->sortableFields(),
         ])->layout('layouts.app', ['header' => 'العملاء']);
+    }
+
+    private function applySorting($query): void
+    {
+        $direction = $this->sortDirection === 'desc' ? 'desc' : 'asc';
+
+        match ($this->sortField) {
+            'phone' => $query->orderBy('phone', $direction),
+            'created_at' => $query->orderBy('created_at', $direction),
+            'updated_at' => $query->orderBy('updated_at', $direction),
+            default => $query->orderBy('name', $direction),
+        };
+
+        if ($this->sortField !== 'name') {
+            $query->orderBy('name');
+        }
+    }
+
+    private function sortableFields(): array
+    {
+        return [
+            'name' => 'العميل',
+            'phone' => 'الهاتف',
+            'created_at' => 'تاريخ الإنشاء',
+            'updated_at' => 'آخر تحديث',
+        ];
     }
 }

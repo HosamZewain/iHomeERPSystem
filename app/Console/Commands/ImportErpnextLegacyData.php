@@ -425,6 +425,8 @@ class ImportErpnextLegacyData extends Command
 
     private function importQuotationItems(Quotation $quotation, string $quotationLegacyId): void
     {
+        $sortOrder = 1;
+
         foreach ($this->csv('quotation_items_clean.csv') as $row) {
             if (($row['quotation_legacy_id'] ?? null) !== $quotationLegacyId) {
                 continue;
@@ -442,6 +444,7 @@ class ImportErpnextLegacyData extends Command
             $discount = $this->itemDiscount($row);
             $item = $quotation->items()->create([
                 'product_id' => $productId,
+                'sort_order' => $sortOrder++,
                 'quantity' => abs($this->decimal($row['qty'] ?? 0)),
                 'unit_sale_price' => abs($this->decimal($row['unit_price'] ?? 0)),
                 'item_discount_type' => $discount['type'],
@@ -460,8 +463,8 @@ class ImportErpnextLegacyData extends Command
             $invoiceNumber = $row['invoice_number'] ?: $legacyId;
 
             if (($row['status'] ?? null) === 'returned') {
-                $this->skip('sales_invoices', $legacyId, 'Deferred because current app has no safe returned-invoice status/workflow');
-                $this->skipItemsFor('sales_invoice_items_clean.csv', 'sales_invoice_items', 'invoice_legacy_id', $legacyId, 'Parent returned sales invoice deferred');
+                $this->skip('sales_invoices', $legacyId, 'Deferred: legacy returned sales invoices are not yet mapped into the current return workflow during import');
+                $this->skipItemsFor('sales_invoice_items_clean.csv', 'sales_invoice_items', 'invoice_legacy_id', $legacyId, 'Parent returned sales invoice deferred until import mapping is added');
 
                 continue;
             }
@@ -530,6 +533,8 @@ class ImportErpnextLegacyData extends Command
 
     private function importSalesInvoiceItems(SalesInvoice $invoice, string $invoiceLegacyId): void
     {
+        $sortOrder = 1;
+
         foreach ($this->csv('sales_invoice_items_clean.csv') as $row) {
             if (($row['invoice_legacy_id'] ?? null) !== $invoiceLegacyId) {
                 continue;
@@ -553,6 +558,7 @@ class ImportErpnextLegacyData extends Command
 
             $item = $invoice->items()->create([
                 'product_id' => $productId,
+                'sort_order' => $sortOrder++,
                 'quantity' => $quantity,
                 'unit_sale_price' => abs($this->decimal($row['unit_price'] ?? 0)),
                 'item_discount_type' => $discount['type'],
@@ -720,11 +726,11 @@ class ImportErpnextLegacyData extends Command
     private function deferSalesReturns(): void
     {
         foreach ($this->csv('sales_returns_clean.csv') as $row) {
-            $this->skip('sales_returns', $row['legacy_id'] ?: $row['invoice_number'], 'Deferred: current app has no safe sales return workflow yet');
+            $this->skip('sales_returns', $row['legacy_id'] ?: $row['invoice_number'], 'Deferred: current app now supports full invoice returns, but legacy sales return import mapping is not implemented yet');
         }
 
         foreach ($this->csv('sales_return_items_clean.csv') as $row) {
-            $this->skip('sales_return_items', $row['legacy_id'], 'Deferred: current app has no safe sales return workflow yet');
+            $this->skip('sales_return_items', $row['legacy_id'], 'Deferred: current app now supports full invoice returns, but legacy sales return item import mapping is not implemented yet');
         }
     }
 

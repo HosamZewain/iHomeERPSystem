@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\QuotationStatus;
 use App\Enums\SalesChannel;
+use App\Enums\InvoicePaymentStatus;
 use App\Enums\SalesInvoiceStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -95,7 +96,9 @@ class Quotation extends Model
 
     public function items(): HasMany
     {
-        return $this->hasMany(QuotationItem::class);
+        return $this->hasMany(QuotationItem::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
     }
 
     public function salesInvoice(): HasOne
@@ -170,12 +173,17 @@ class Quotation extends Model
                 'total_cost' => 0,
                 'total_profit' => 0,
                 'status' => SalesInvoiceStatus::Draft,
+                'payment_status' => InvoicePaymentStatus::Unpaid,
+                'paid_amount' => 0,
+                'remaining_amount' => (float) $quotation->total,
+                'due_date' => null,
                 'created_by' => $user?->id ?? $quotation->created_by,
             ]);
 
             foreach ($quotation->items as $item) {
                 $invoice->items()->create([
                     'product_id' => $item->product_id,
+                    'sort_order' => (int) $item->sort_order,
                     'quantity' => (float) $item->quantity,
                     'unit_sale_price' => (float) $item->unit_sale_price,
                     'item_discount_type' => $item->item_discount_type,

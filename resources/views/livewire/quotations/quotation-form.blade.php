@@ -11,17 +11,24 @@
         <x-alert type="error" :message="$errors->first('items')" />
     @endif
 
-    @if(! $hasCustomers || ! $hasActiveProducts)
-        <x-alert type="warning" message="أضف عميلًا واحدًا ومنتجًا نشطًا واحدًا على الأقل قبل إنشاء عرض سعر." />
+    @if(! $hasActiveProducts)
+        <x-alert type="warning" message="أضف منتجًا نشطًا واحدًا على الأقل قبل إنشاء عرض سعر." />
     @endif
 
     <form wire:submit="save" class="space-y-6">
-        <x-card title="بيانات عرض السعر">
+        <x-card title="بيانات عرض السعر" :allow-overflow="true">
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <x-input label="رقم عرض السعر" wire:model="quotation_number" type="text" required :error="$errors->first('quotation_number')" />
 
-                <div class="relative">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">العميل</label>
+                <div class="relative md:col-span-2 xl:col-span-2">
+                    <div class="mb-1 flex items-center justify-between gap-3">
+                        <label class="block text-sm font-medium text-gray-700">العميل</label>
+                        <button type="button"
+                                wire:click="{{ $showCreateCustomerForm ? 'cancelCreateCustomer' : 'showCreateCustomer' }}"
+                                class="text-sm font-medium text-primary-600 hover:text-primary-800">
+                            {{ $showCreateCustomerForm ? 'إغلاق نموذج العميل' : 'إضافة عميل جديد' }}
+                        </button>
+                    </div>
                     <input type="hidden" wire:model="customer_id">
                     <input wire:model.live.debounce.300ms="customerSearch"
                            type="search"
@@ -40,8 +47,40 @@
                                     <span class="block text-xs text-gray-500">{{ $customer->phone ?: '-' }}</span>
                                 </button>
                             @empty
-                                <div class="px-3 py-2 text-sm text-gray-500">لا توجد نتائج مطابقة.</div>
+                                <div class="px-3 py-2 text-sm text-gray-500">لا توجد نتائج مطابقة. استخدم "إضافة عميل جديد" من نفس الشاشة.</div>
                             @endforelse
+                        </div>
+                    @endif
+
+                    @if($showCreateCustomerForm)
+                        <div class="mt-3 rounded-lg border border-primary-100 bg-primary-50/40 p-4">
+                            <div class="mb-3 flex items-center justify-between gap-3">
+                                <div>
+                                    <h3 class="text-sm font-semibold text-gray-900">إضافة عميل جديد</h3>
+                                    <p class="text-xs text-gray-500">بعد الحفظ سيتم اختيار العميل مباشرة في عرض السعر.</p>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <x-input label="اسم العميل" wire:model="new_customer_name" type="text" required :error="$errors->first('new_customer_name')" />
+                                <x-input label="رقم الهاتف" wire:model="new_customer_phone" type="text" required :error="$errors->first('new_customer_phone')" />
+                                <x-input label="البريد الإلكتروني" wire:model="new_customer_email" type="email" :error="$errors->first('new_customer_email')" />
+                                <x-input label="العنوان" wire:model="new_customer_address" type="text" :error="$errors->first('new_customer_address')" />
+                            </div>
+
+                            <div class="mt-3">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">ملاحظات العميل</label>
+                                <textarea wire:model="new_customer_notes" rows="3"
+                                          class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm py-2.5 px-3 border"></textarea>
+                                @if($errors->has('new_customer_notes'))
+                                    <p class="mt-1 text-xs text-red-600">{{ $errors->first('new_customer_notes') }}</p>
+                                @endif
+                            </div>
+
+                            <div class="mt-4 flex flex-col sm:flex-row sm:justify-end gap-3">
+                                <x-button wire:click="cancelCreateCustomer" type="button" variant="secondary" class="w-full sm:w-auto">إلغاء</x-button>
+                                <x-button wire:click="createCustomer" type="button" class="w-full sm:w-auto">حفظ العميل واختياره</x-button>
+                            </div>
                         </div>
                     @endif
                 </div>
@@ -65,7 +104,7 @@
             </div>
         </x-card>
 
-        <x-card title="البنود والخصومات">
+        <x-card title="البنود والخصومات" :allow-overflow="true">
             <div class="hidden xl:block">
                 <div class="grid grid-cols-12 gap-3 px-1 pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <div class="col-span-3">المنتج</div>

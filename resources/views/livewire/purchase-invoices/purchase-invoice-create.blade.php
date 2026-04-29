@@ -40,7 +40,7 @@
             </div>
         </x-card>
 
-        <x-card title="البنود">
+        <x-card title="البنود" :allow-overflow="true">
             <div class="hidden md:block">
                 <div class="grid grid-cols-12 gap-3 px-1 pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <div class="col-span-5">المنتج</div>

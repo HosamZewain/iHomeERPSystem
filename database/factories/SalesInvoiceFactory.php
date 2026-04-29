@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\SalesChannel;
+use App\Enums\InvoicePaymentStatus;
 use App\Enums\SalesInvoiceStatus;
 use App\Models\Customer;
 use App\Models\SalesInvoice;
@@ -49,7 +50,17 @@ class SalesInvoiceFactory extends Factory
             'total_cost' => 0,
             'total_profit' => 0,
             'status' => SalesInvoiceStatus::Draft->value,
+            'payment_status' => InvoicePaymentStatus::Unpaid->value,
+            'paid_amount' => 0,
+            'remaining_amount' => 0,
+            'due_date' => null,
+            'return_reason' => null,
+            'confirmed_at' => null,
+            'cancelled_at' => null,
+            'returned_at' => null,
             'created_by' => User::factory(),
+            'confirmed_by' => null,
+            'returned_by' => null,
         ];
     }
 }

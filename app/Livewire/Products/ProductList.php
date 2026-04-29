@@ -260,6 +260,8 @@ class ProductList extends Component
             'average_cost' => $query->orderBy('current_average_cost', $direction),
             'stock' => $query->orderByRaw(Product::stockQuantitySubquerySql().' '.$direction),
             'status' => $query->orderBy('is_active', $direction),
+            'created_at' => $query->orderBy('created_at', $direction),
+            'updated_at' => $query->orderBy('updated_at', $direction),
             default => $query->orderBy('name', $direction),
         };
 
@@ -279,6 +281,8 @@ class ProductList extends Component
             'average_cost' => 'متوسط التكلفة',
             'stock' => 'المخزون',
             'status' => 'الحالة',
+            'created_at' => 'تاريخ الإنشاء',
+            'updated_at' => 'آخر تحديث',
         ];
     }
 }
