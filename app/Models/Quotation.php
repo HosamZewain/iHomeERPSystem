@@ -101,6 +101,14 @@ class Quotation extends Model
             ->orderBy('id');
     }
 
+    public function productItems(): HasMany
+    {
+        return $this->hasMany(QuotationItem::class)
+            ->where('row_type', QuotationItem::TYPE_PRODUCT)
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
     public function salesInvoice(): HasOne
     {
         return $this->hasOne(SalesInvoice::class);
@@ -113,9 +121,9 @@ class Quotation extends Model
 
     public function canConvert(): bool
     {
-        $hasItems = array_key_exists('items_count', $this->attributes)
-            ? (int) $this->attributes['items_count'] > 0
-            : $this->items()->exists();
+        $hasItems = array_key_exists('product_items_count', $this->attributes)
+            ? (int) $this->attributes['product_items_count'] > 0
+            : $this->productItems()->exists();
 
         $hasSalesInvoice = $this->relationLoaded('salesInvoice')
             ? $this->salesInvoice !== null
@@ -133,7 +141,7 @@ class Quotation extends Model
                 ->whereKey($this->getKey())
                 ->lockForUpdate()
                 ->with(['items'])
-                ->withCount('items')
+                ->withCount('productItems')
                 ->firstOrFail();
 
             if (! $quotation->canConvert()) {
@@ -180,10 +188,16 @@ class Quotation extends Model
                 'created_by' => $user?->id ?? $quotation->created_by,
             ]);
 
+            $invoiceSortOrder = 1;
+
             foreach ($quotation->items as $item) {
+                if ($item->isSection()) {
+                    continue;
+                }
+
                 $invoice->items()->create([
                     'product_id' => $item->product_id,
-                    'sort_order' => (int) $item->sort_order,
+                    'sort_order' => $invoiceSortOrder++,
                     'quantity' => (float) $item->quantity,
                     'unit_sale_price' => (float) $item->unit_sale_price,
                     'item_discount_type' => $item->item_discount_type,

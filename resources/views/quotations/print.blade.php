@@ -15,7 +15,7 @@
     $netProductsTotal = max((float) $quotation->subtotal - (float) $quotation->invoice_discount_amount, 0);
     $showInstallationRow = $quotationPrint['show_installation'] && $quotation->installation_enabled;
     $installationItemName = filled($quotationPrint['installation_item_name'] ?? null) ? $quotationPrint['installation_item_name'] : 'خدمة التركيب';
-    $printedItemsCount = $quotation->items->count() + ($showInstallationRow ? 1 : 0);
+    $printedItemsCount = $quotation->items->where('row_type', \App\Models\QuotationItem::TYPE_PRODUCT)->count() + ($showInstallationRow ? 1 : 0);
 @endphp
 
 @extends('print.layout')
@@ -91,41 +91,55 @@
             </tr>
         </thead>
         <tbody>
+            @php $printedSequence = 0; @endphp
             @foreach($quotation->items as $item)
-                @php
-                    $discountValue = $item->item_discount_type === \App\Models\Quotation::DISCOUNT_PERCENTAGE
-                        ? number_format((float) $item->item_discount_value, 2) . '%'
-                        : \App\Support\Money::format($item->item_discount_value);
-                @endphp
-                <tr>
-                    <td class="sequence">{{ $loop->iteration }}</td>
-                    @if($quotationPrint['show_product_images'])
-                        <td class="image-column">
-                            @if($item->product->image_path)
-                                <img class="product-image" src="{{ $item->product->image_path }}" alt="{{ $item->product->name }}">
-                            @else
-                                <span class="muted">-</span>
+                @if($item->isSection())
+                    <tr>
+                        <td colspan="{{ $quotationPrint['show_product_images'] ? ($quotationPrint['show_item_discounts'] ? 7 : 6) : ($quotationPrint['show_item_discounts'] ? 6 : 5) }}"
+                            style="background:#eef4ff;font-weight:700;color:#1e3a8a;">
+                            {{ $item->section_title }}
+                        </td>
+                    </tr>
+                @else
+                    @php
+                        $printedSequence++;
+                        $discountValue = $item->item_discount_type === \App\Models\Quotation::DISCOUNT_PERCENTAGE
+                            ? number_format((float) $item->item_discount_value, 2) . '%'
+                            : \App\Support\Money::format($item->item_discount_value);
+                    @endphp
+                    <tr>
+                        <td class="sequence">{{ $printedSequence }}</td>
+                        @if($quotationPrint['show_product_images'])
+                            <td class="image-column">
+                                @if($item->product?->image_path)
+                                    <img class="product-image" src="{{ $item->product->image_path }}" alt="{{ $item->product?->name }}">
+                                @else
+                                    <span class="muted">-</span>
+                                @endif
+                            </td>
+                        @endif
+                        <td>
+                            <div class="product-name">{{ $item->product?->name }}</div>
+                            <div class="muted">{{ $item->product?->internal_sku }}</div>
+                            @if($item->description)
+                                <div class="muted" style="margin-top:6px; white-space:pre-line;">{{ $item->description }}</div>
                             @endif
                         </td>
-                    @endif
-                    <td>
-                        <div class="product-name">{{ $item->product->name }}</div>
-                        <div class="muted">{{ $item->product->internal_sku }}</div>
-                    </td>
-                    <td class="number">{{ number_format((float) $item->quantity, 2) }}</td>
-                    <td class="number">{{ \App\Support\Money::format($item->unit_sale_price) }}</td>
-                    @if($quotationPrint['show_item_discounts'])
-                        <td>
-                            <div>{{ $discountTypes[$item->item_discount_type] ?? $item->item_discount_type }}: {{ $discountValue }}</div>
-                            <div class="muted">القيمة: {{ \App\Support\Money::format($item->item_discount_amount) }}</div>
-                        </td>
-                    @endif
-                    <td class="number">{{ \App\Support\Money::format($item->line_total) }}</td>
-                </tr>
+                        <td class="number">{{ number_format((float) $item->quantity, 2) }}</td>
+                        <td class="number">{{ \App\Support\Money::format($item->unit_sale_price) }}</td>
+                        @if($quotationPrint['show_item_discounts'])
+                            <td>
+                                <div>{{ $discountTypes[$item->item_discount_type] ?? $item->item_discount_type }}: {{ $discountValue }}</div>
+                                <div class="muted">القيمة: {{ \App\Support\Money::format($item->item_discount_amount) }}</div>
+                            </td>
+                        @endif
+                        <td class="number">{{ \App\Support\Money::format($item->line_total) }}</td>
+                    </tr>
+                @endif
             @endforeach
             @if($showInstallationRow)
                 <tr>
-                    <td class="sequence">{{ $quotation->items->count() + 1 }}</td>
+                    <td class="sequence">{{ $printedSequence + 1 }}</td>
                     @if($quotationPrint['show_product_images'])
                         <td class="image-column"><span class="muted">-</span></td>
                     @endif

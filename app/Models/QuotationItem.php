@@ -10,9 +10,15 @@ class QuotationItem extends Model
 {
     use HasFactory;
 
+    public const TYPE_PRODUCT = 'product';
+    public const TYPE_SECTION = 'section';
+
     protected $fillable = [
         'quotation_id',
+        'row_type',
         'product_id',
+        'section_title',
+        'description',
         'sort_order',
         'quantity',
         'unit_sale_price',
@@ -25,6 +31,7 @@ class QuotationItem extends Model
     protected function casts(): array
     {
         return [
+            'row_type' => 'string',
             'sort_order' => 'integer',
             'quantity' => 'decimal:2',
             'unit_sale_price' => 'decimal:2',
@@ -32,6 +39,13 @@ class QuotationItem extends Model
             'item_discount_amount' => 'decimal:2',
             'line_total' => 'decimal:2',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (QuotationItem $item) {
+            $item->row_type ??= self::TYPE_PRODUCT;
+        });
     }
 
     public function quotation(): BelongsTo
@@ -42,5 +56,15 @@ class QuotationItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function isSection(): bool
+    {
+        return $this->row_type === self::TYPE_SECTION;
+    }
+
+    public function isProduct(): bool
+    {
+        return $this->row_type === self::TYPE_PRODUCT;
     }
 }

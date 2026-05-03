@@ -465,13 +465,27 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Statuses: draft, sent, approved, rejected, expired, converted.
 - Quotations do not affect stock.
 - Quotations are separate from sales invoices.
-- Quotation items use persisted `sort_order` so manual item entry order is preserved across save, edit, show, print, and conversion.
+- Quotation items use persisted `sort_order` so manual row entry order is preserved across save, edit, show, print, and conversion.
+- Quotation rows now support two row types:
+  - `product`
+  - `section`
+- Section rows are quotation-only structural rows:
+  - stored in the same ordered `quotation_items` stream
+  - use `row_type = section`
+  - store `section_title`
+  - do not affect subtotal, discounts, or total
+- Product rows can store an optional quotation-only `description`:
+  - specific to that quotation row
+  - shown on quotation show/print when present
+  - not copied to sales invoice rows
 - Quotation-to-sales-invoice conversion is implemented via `Quotation::convertToSalesInvoice()`.
-- Conversion creates a draft sales invoice, copies customer, product items, prices, item discounts, invoice discount, notes, and installation fields, then marks quotation converted.
+- Conversion creates a draft sales invoice, copies customer, product rows only, prices, item discounts, invoice discount, notes, and installation fields, then marks quotation converted.
+- Section rows are ignored during quotation-to-invoice conversion.
 - Conversion does not confirm stock or create stock movements.
 - Quotation list supports search, filters, sorting, mobile cards, desktop table, and visible `created_at` / `updated_at` columns with sorting.
 - Quotation form has searchable customer/product selection integrated into the same selector UI.
 - Quotation form supports creating a new customer inline without leaving the screen.
+- Quotation form supports adding named section rows, moving rows up/down, and saving optional per-product quotation descriptions.
 - Quotation create/edit cards that contain searchable dropdowns use visible card overflow so result lists are not clipped inside the card container.
 
 ### Sales Invoices
@@ -625,6 +639,9 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Quotations are separate from sales invoices.
 - Quotations do not affect stock.
 - Quotations can be converted to draft sales invoices; the sales invoice still follows normal confirmation/stock logic.
+- Quotation section rows are structural only and never affect totals or stock.
+- Only quotation product rows affect quotation pricing, discounts, and total.
+- Quotation-only item descriptions do not affect pricing and do not flow into sales invoice items.
 - Item-level discounts apply to product rows.
 - Invoice-level discounts apply to product totals only.
 - Installation is separate from products and does not affect stock.
@@ -664,9 +681,10 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 
 ### Quotation Totals
 
-- `subtotal` is the sum of quotation item line totals.
+- `subtotal` is the sum of quotation product-row line totals only.
 - Invoice discount applies to products subtotal only.
 - Net products total = `subtotal - invoice_discount_amount`.
+- Quotation section rows contribute `0` to all pricing calculations.
 - Installation total:
   - 0 if disabled.
   - fixed amount if fixed.
@@ -735,6 +753,8 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - A shared print layout is used with document-specific content sections.
 - Print templates control content visibility and layout style.
 - Template selector is available on print pages when active templates exist.
+- Quotation print supports section headers inside the item table.
+- Quotation print shows quotation item descriptions under the product name only when a description exists.
 - Sales invoice print now shows payment status, paid amount, remaining amount, and due date when available.
 - Printable payment receipt (`إيصال استلام`) exists per recorded payment and reuses the shared print layout with invoice/company branding.
 - Product images can be shown/hidden per template.
@@ -759,6 +779,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Purchase invoices with confirmation stock increase and average cost update.
 - Movement-based stock model, summary, movement history, and stock report.
 - Quotations with discounts, installation, edit, print, and conversion to draft sales invoice.
+- Quotations also support section/group rows and quotation-only per-item descriptions.
 - Sales invoices with direct/partner channel, discounts, installation, partner commission, draft editing, confirmation stock decrease, full confirmed-invoice return, profit calculation, payment collection tracking, print, payment receipt print, and partner settlement print.
 - Multiple print templates for quotations and sales invoices.
 - Print template branding image uploads and warranty terms page.

@@ -101,19 +101,28 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             @foreach($quotation->items as $item)
-                                <tr>
-                                    <td class="px-6 py-4">
-                                        <div class="text-sm font-medium text-gray-900">{{ $item->product->name }}</div>
-                                        <div class="text-sm text-gray-500">{{ $item->product->internal_sku }}</div>
-                                    </td>
-                                    <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ number_format((float) $item->quantity, 2) }}</td>
-                                    <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ \App\Support\Money::format($item->unit_sale_price) }}</td>
-                                    <td class="px-6 py-4 text-sm text-gray-700 text-right">
-                                        {{ $discountTypes[$item->item_discount_type] ?? $item->item_discount_type }}
-                                        <div class="text-xs text-gray-400">{{ \App\Support\Money::format($item->item_discount_amount) }}</div>
-                                    </td>
-                                    <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ \App\Support\Money::format($item->line_total) }}</td>
-                                </tr>
+                                @if($item->isSection())
+                                    <tr class="bg-primary-50/60">
+                                        <td colspan="5" class="px-6 py-3 text-sm font-semibold text-primary-900">{{ $item->section_title }}</td>
+                                    </tr>
+                                @else
+                                    <tr>
+                                        <td class="px-6 py-4">
+                                            <div class="text-sm font-medium text-gray-900">{{ $item->product?->name }}</div>
+                                            <div class="text-sm text-gray-500">{{ $item->product?->internal_sku }}</div>
+                                            @if($item->description)
+                                                <div class="mt-2 text-xs leading-6 text-gray-600 whitespace-pre-line">{{ $item->description }}</div>
+                                            @endif
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ number_format((float) $item->quantity, 2) }}</td>
+                                        <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ \App\Support\Money::format($item->unit_sale_price) }}</td>
+                                        <td class="px-6 py-4 text-sm text-gray-700 text-right">
+                                            {{ $discountTypes[$item->item_discount_type] ?? $item->item_discount_type }}
+                                            <div class="text-xs text-gray-400">{{ \App\Support\Money::format($item->item_discount_amount) }}</div>
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ \App\Support\Money::format($item->line_total) }}</td>
+                                    </tr>
+                                @endif
                             @endforeach
                         </tbody>
                     </table>
@@ -121,28 +130,37 @@
 
                 <div class="lg:hidden p-4 space-y-3">
                     @foreach($quotation->items as $item)
-                        <div class="rounded-lg border border-gray-200 p-3">
-                            <div class="text-sm font-medium text-gray-900">{{ $item->product->name }}</div>
-                            <div class="text-xs text-gray-500">{{ $item->product->internal_sku }}</div>
-                            <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
-                                <div>
-                                    <p class="text-gray-500">الكمية</p>
-                                    <p class="font-medium text-gray-900">{{ number_format((float) $item->quantity, 2) }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-gray-500">سعر الوحدة</p>
-                                    <p class="font-medium text-gray-900">{{ \App\Support\Money::format($item->unit_sale_price) }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-gray-500">خصم البند</p>
-                                    <p class="font-medium text-red-700">{{ \App\Support\Money::format($item->item_discount_amount) }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-gray-500">الإجمالي</p>
-                                    <p class="font-medium text-gray-900">{{ \App\Support\Money::format($item->line_total) }}</p>
+                        @if($item->isSection())
+                            <div class="rounded-lg border border-primary-200 bg-primary-50/60 p-3 text-sm font-semibold text-primary-900">
+                                {{ $item->section_title }}
+                            </div>
+                        @else
+                            <div class="rounded-lg border border-gray-200 p-3">
+                                <div class="text-sm font-medium text-gray-900">{{ $item->product?->name }}</div>
+                                <div class="text-xs text-gray-500">{{ $item->product?->internal_sku }}</div>
+                                @if($item->description)
+                                    <div class="mt-2 text-xs leading-6 text-gray-600 whitespace-pre-line">{{ $item->description }}</div>
+                                @endif
+                                <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                        <p class="text-gray-500">الكمية</p>
+                                        <p class="font-medium text-gray-900">{{ number_format((float) $item->quantity, 2) }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500">سعر الوحدة</p>
+                                        <p class="font-medium text-gray-900">{{ \App\Support\Money::format($item->unit_sale_price) }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500">خصم البند</p>
+                                        <p class="font-medium text-red-700">{{ \App\Support\Money::format($item->item_discount_amount) }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500">الإجمالي</p>
+                                        <p class="font-medium text-gray-900">{{ \App\Support\Money::format($item->line_total) }}</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        @endif
                     @endforeach
                 </div>
             </x-card>

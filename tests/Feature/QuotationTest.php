@@ -328,4 +328,132 @@ class QuotationTest extends TestCase
         $this->assertSame([$productA->id, $productC->id, $productB->id], $invoice->items->pluck('product_id')->all());
         $this->assertSame([1, 2, 3], $invoice->items->pluck('sort_order')->all());
     }
+
+    public function test_quotation_supports_sections_and_product_descriptions_without_affecting_totals(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::factory()->create();
+        $productA = Product::factory()->create(['name' => 'Bed Sensor', 'internal_sku' => 'BED-1', 'sale_price' => 1000, 'is_active' => true]);
+        $productB = Product::factory()->create(['name' => 'Living Speaker', 'internal_sku' => 'LIV-1', 'sale_price' => 500, 'is_active' => true]);
+
+        Livewire::actingAs($user)
+            ->test(QuotationForm::class)
+            ->set('quotation_number', 'QUO-SECTIONS-001')
+            ->set('customer_id', (string) $customer->id)
+            ->set('quotation_date', '2026-05-02')
+            ->call('addSection')
+            ->set('items.1.section_title', 'غرفة النوم')
+            ->call('moveItemUp', 1)
+            ->set('items.1.product_id', (string) $productA->id)
+            ->set('items.1.quantity', '2')
+            ->set('items.1.unit_sale_price', '1000')
+            ->set('items.1.description', 'يشمل حساسين للسرير مع ضبط أولي.')
+            ->call('addSection')
+            ->set('items.2.section_title', 'الريسيبشن')
+            ->call('addItem')
+            ->set('items.3.product_id', (string) $productB->id)
+            ->set('items.3.quantity', '1')
+            ->set('items.3.unit_sale_price', '500')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $quotation = Quotation::query()->with('items.product')->firstOrFail();
+
+        $this->assertSame(
+            [
+                QuotationItem::TYPE_SECTION,
+                QuotationItem::TYPE_PRODUCT,
+                QuotationItem::TYPE_SECTION,
+                QuotationItem::TYPE_PRODUCT,
+            ],
+            $quotation->items->pluck('row_type')->all()
+        );
+        $this->assertSame(['غرفة النوم', null, 'الريسيبشن', null], $quotation->items->pluck('section_title')->all());
+        $this->assertSame([1, 2, 3, 4], $quotation->items->pluck('sort_order')->all());
+        $this->assertSame('يشمل حساسين للسرير مع ضبط أولي.', $quotation->items[1]->description);
+        $this->assertEquals(2500.0, (float) $quotation->subtotal);
+        $this->assertEquals(2500.0, (float) $quotation->total);
+
+        $this->actingAs($user)
+            ->get(route('quotations.show', $quotation))
+            ->assertOk()
+            ->assertSeeInOrder(['غرفة النوم', 'Bed Sensor', 'الريسيبشن', 'Living Speaker']);
+
+        $this->actingAs($user)
+            ->get(route('quotations.print', $quotation))
+            ->assertOk()
+            ->assertSeeInOrder(['غرفة النوم', 'Bed Sensor', 'الريسيبشن', 'Living Speaker'])
+            ->assertSee('يشمل حساسين للسرير مع ضبط أولي.');
+    }
+
+    public function test_quotation_conversion_ignores_section_rows_and_preserves_product_order(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::factory()->create();
+        $productA = Product::factory()->create(['name' => 'Product A', 'sale_price' => 100, 'is_active' => true]);
+        $productB = Product::factory()->create(['name' => 'Product B', 'sale_price' => 200, 'is_active' => true]);
+
+        $quotation = Quotation::factory()->create([
+            'customer_id' => $customer->id,
+            'subtotal' => 300,
+            'total' => 300,
+            'created_by' => $user->id,
+        ]);
+
+        QuotationItem::factory()->create([
+            'quotation_id' => $quotation->id,
+            'row_type' => QuotationItem::TYPE_SECTION,
+            'product_id' => null,
+            'section_title' => 'غرفة النوم',
+            'description' => null,
+            'sort_order' => 1,
+            'quantity' => 0,
+            'unit_sale_price' => 0,
+            'item_discount_value' => 0,
+            'item_discount_amount' => 0,
+            'line_total' => 0,
+        ]);
+
+        QuotationItem::factory()->create([
+            'quotation_id' => $quotation->id,
+            'product_id' => $productA->id,
+            'sort_order' => 2,
+            'quantity' => 1,
+            'unit_sale_price' => 100,
+            'item_discount_value' => 0,
+            'item_discount_amount' => 0,
+            'line_total' => 100,
+        ]);
+
+        QuotationItem::factory()->create([
+            'quotation_id' => $quotation->id,
+            'row_type' => QuotationItem::TYPE_SECTION,
+            'product_id' => null,
+            'section_title' => 'الريسيبشن',
+            'description' => null,
+            'sort_order' => 3,
+            'quantity' => 0,
+            'unit_sale_price' => 0,
+            'item_discount_value' => 0,
+            'item_discount_amount' => 0,
+            'line_total' => 0,
+        ]);
+
+        QuotationItem::factory()->create([
+            'quotation_id' => $quotation->id,
+            'product_id' => $productB->id,
+            'sort_order' => 4,
+            'quantity' => 1,
+            'unit_sale_price' => 200,
+            'item_discount_value' => 0,
+            'item_discount_amount' => 0,
+            'line_total' => 200,
+        ]);
+
+        $invoice = $quotation->convertToSalesInvoice($user)->load('items');
+
+        $this->assertCount(2, $invoice->items);
+        $this->assertSame([$productA->id, $productB->id], $invoice->items->pluck('product_id')->all());
+        $this->assertSame([1, 2], $invoice->items->pluck('sort_order')->all());
+    }
 }

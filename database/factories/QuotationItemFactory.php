@@ -20,7 +20,10 @@ class QuotationItemFactory extends Factory
 
         return [
             'quotation_id' => Quotation::factory(),
+            'row_type' => \App\Models\QuotationItem::TYPE_PRODUCT,
             'product_id' => Product::factory(),
+            'section_title' => null,
+            'description' => null,
             'sort_order' => fake()->numberBetween(1, 10),
             'quantity' => $quantity,
             'unit_sale_price' => $unitSalePrice,

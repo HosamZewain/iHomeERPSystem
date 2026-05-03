@@ -105,93 +105,121 @@
         </x-card>
 
         <x-card title="البنود والخصومات" :allow-overflow="true">
-            <div class="hidden xl:block">
-                <div class="grid grid-cols-12 gap-3 px-1 pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <div class="col-span-3">المنتج</div>
-                    <div class="col-span-1 text-right">الكمية</div>
-                    <div class="col-span-2 text-right">سعر الوحدة</div>
-                    <div class="col-span-2 text-right">نوع الخصم</div>
-                    <div class="col-span-1 text-right">قيمة الخصم</div>
-                    <div class="col-span-2 text-right">الإجمالي</div>
-                    <div class="col-span-1"></div>
-                </div>
-            </div>
-
             <div class="space-y-3">
                 @foreach($items as $index => $item)
-                    <div class="grid grid-cols-1 xl:grid-cols-12 gap-3 bg-gray-50 xl:bg-white border border-gray-200 xl:border-0 rounded-lg xl:rounded-none p-3 xl:p-0">
-                        <div class="xl:col-span-3">
-                            <div class="relative">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">المنتج</label>
-                                <input type="hidden" wire:model="items.{{ $index }}.product_id">
-                                <input wire:model.live.debounce.300ms="productSearch.{{ $index }}"
-                                       type="search"
-                                       placeholder="اكتب اسم المنتج أو SKU..."
-                                       class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm py-2.5 px-3 border {{ $errors->has('items.' . $index . '.product_id') ? 'border-red-500' : 'border-gray-300' }}">
-                                @if($errors->has('items.' . $index . '.product_id'))
-                                    <p class="mt-1 text-xs text-red-600">{{ $errors->first('items.' . $index . '.product_id') }}</p>
-                                @endif
-                                @if(($productSearch[$index] ?? '') !== '' && ! ($items[$index]['product_id'] ?? ''))
-                                    <div class="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                                        @forelse($this->productOptionsFor($index) as $product)
-                                            <button type="button"
-                                                    wire:click="selectProduct({{ $index }}, {{ $product->id }})"
-                                                    class="block w-full px-3 py-2 text-right text-sm text-gray-700 hover:bg-primary-50">
-                                                <span class="font-medium text-gray-900">{{ $product->name }}</span>
-                                                <span class="block text-xs text-gray-500">{{ $product->internal_sku }}</span>
-                                            </button>
-                                        @empty
-                                            <div class="px-3 py-2 text-sm text-gray-500">لا توجد نتائج مطابقة.</div>
-                                        @endforelse
+                    @if(($item['row_type'] ?? \App\Models\QuotationItem::TYPE_PRODUCT) === \App\Models\QuotationItem::TYPE_SECTION)
+                        <div class="rounded-lg border border-primary-200 bg-primary-50/50 p-4">
+                            <input type="hidden" wire:model="items.{{ $index }}.row_type">
+                            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                <div class="flex-1">
+                                    <x-input label="اسم القسم" wire:model.live="items.{{ $index }}.section_title" type="text" placeholder="مثال: غرفة النوم" :error="$errors->first('items.' . $index . '.section_title')" />
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-2 md:w-auto md:grid-cols-3">
+                                    <button type="button" wire:click="moveItemUp({{ $index }})" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">أعلى</button>
+                                    <button type="button" wire:click="moveItemDown({{ $index }})" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">أسفل</button>
+                                    <button type="button" wire:click="removeItem({{ $index }})" class="rounded-lg border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50 md:col-span-1 col-span-2">حذف</button>
+                                </div>
+                            </div>
+                            <p class="mt-3 text-xs text-primary-900/80">القسم ينظم عرض السعر فقط ولا يؤثر على الكمية أو السعر أو الإجمالي.</p>
+                        </div>
+                    @else
+                        <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                            <input type="hidden" wire:model="items.{{ $index }}.row_type">
+
+                            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                <div class="text-xs font-medium text-gray-500">بند منتج #{{ $index + 1 }}</div>
+                                <div class="flex flex-wrap gap-2">
+                                    <button type="button" wire:click="moveItemUp({{ $index }})" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">أعلى</button>
+                                    <button type="button" wire:click="moveItemDown({{ $index }})" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">أسفل</button>
+                                    <button wire:click="removeItem({{ $index }})" type="button" class="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm text-red-700 hover:bg-red-50">حذف</button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 xl:grid-cols-12 gap-3">
+                                <div class="xl:col-span-3">
+                                    <div class="relative">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">المنتج</label>
+                                        <input type="hidden" wire:model="items.{{ $index }}.product_id">
+                                        <input wire:model.live.debounce.300ms="productSearch.{{ $index }}"
+                                               type="search"
+                                               placeholder="اكتب اسم المنتج أو SKU..."
+                                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm py-2.5 px-3 border {{ $errors->has('items.' . $index . '.product_id') ? 'border-red-500' : 'border-gray-300' }}">
+                                        @if($errors->has('items.' . $index . '.product_id'))
+                                            <p class="mt-1 text-xs text-red-600">{{ $errors->first('items.' . $index . '.product_id') }}</p>
+                                        @endif
+                                        @if(($productSearch[$index] ?? '') !== '' && ! ($items[$index]['product_id'] ?? ''))
+                                            <div class="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                                                @forelse($this->productOptionsFor($index) as $product)
+                                                    <button type="button"
+                                                            wire:click="selectProduct({{ $index }}, {{ $product->id }})"
+                                                            class="block w-full px-3 py-2 text-right text-sm text-gray-700 hover:bg-primary-50">
+                                                        <span class="font-medium text-gray-900">{{ $product->name }}</span>
+                                                        <span class="block text-xs text-gray-500">{{ $product->internal_sku }}</span>
+                                                    </button>
+                                                @empty
+                                                    <div class="px-3 py-2 text-sm text-gray-500">لا توجد نتائج مطابقة.</div>
+                                                @endforelse
+                                            </div>
+                                        @endif
                                     </div>
+                                </div>
+
+                                <div class="xl:col-span-1">
+                                    <x-input label="الكمية" wire:model.live="items.{{ $index }}.quantity" type="number" step="0.01" min="0.01" required :error="$errors->first('items.' . $index . '.quantity')" />
+                                </div>
+
+                                <div class="xl:col-span-2">
+                                    <x-input label="سعر الوحدة" wire:model.live="items.{{ $index }}.unit_sale_price" type="number" step="0.01" min="0" required :error="$errors->first('items.' . $index . '.unit_sale_price')" />
+                                </div>
+
+                                <div class="xl:col-span-2">
+                                    <x-select label="نوع خصم البند" wire:model.live="items.{{ $index }}.item_discount_type" required :error="$errors->first('items.' . $index . '.item_discount_type')">
+                                        @foreach($discountTypes as $type => $label)
+                                            <option value="{{ $type }}">{{ $label }}</option>
+                                        @endforeach
+                                    </x-select>
+                                </div>
+
+                                <div class="xl:col-span-1">
+                                    <x-input label="قيمة الخصم" wire:model.live="items.{{ $index }}.item_discount_value" type="number" step="0.01" min="0" :max="($item['item_discount_type'] ?? '') === 'percentage' ? '100' : null" required :error="$errors->first('items.' . $index . '.item_discount_value')" />
+                                </div>
+
+                                <div class="xl:col-span-3 xl:pt-6">
+                                    <p class="text-xs text-gray-500 xl:text-right">الإجمالي بعد خصم البند</p>
+                                    <p class="text-sm font-medium text-gray-900 xl:text-right">{{ \App\Support\Money::format($this->lineTotalFor($index)) }}</p>
+                                    <p class="text-xs text-gray-400 xl:text-right">خصم: {{ \App\Support\Money::format($this->itemDiscountAmountFor($index)) }}</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <label class="mb-1 block text-sm font-medium text-gray-700">وصف البند داخل عرض السعر</label>
+                                <textarea wire:model.live="items.{{ $index }}.description"
+                                          rows="3"
+                                          placeholder="وصف اختياري يظهر تحت المنتج في عرض السعر المطبوع فقط."
+                                          class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm py-2.5 px-3 border"></textarea>
+                                @if($errors->has('items.' . $index . '.description'))
+                                    <p class="mt-1 text-xs text-red-600">{{ $errors->first('items.' . $index . '.description') }}</p>
                                 @endif
                             </div>
                         </div>
-
-                        <div class="xl:col-span-1">
-                            <x-input label="الكمية" wire:model.live="items.{{ $index }}.quantity" type="number" step="0.01" min="0.01" required :error="$errors->first('items.' . $index . '.quantity')" />
-                        </div>
-
-                        <div class="xl:col-span-2">
-                            <x-input label="سعر الوحدة" wire:model.live="items.{{ $index }}.unit_sale_price" type="number" step="0.01" min="0" required :error="$errors->first('items.' . $index . '.unit_sale_price')" />
-                        </div>
-
-                        <div class="xl:col-span-2">
-                            <x-select label="نوع خصم البند" wire:model.live="items.{{ $index }}.item_discount_type" required :error="$errors->first('items.' . $index . '.item_discount_type')">
-                                @foreach($discountTypes as $type => $label)
-                                    <option value="{{ $type }}">{{ $label }}</option>
-                                @endforeach
-                            </x-select>
-                        </div>
-
-                        <div class="xl:col-span-1">
-                            <x-input label="قيمة الخصم" wire:model.live="items.{{ $index }}.item_discount_value" type="number" step="0.01" min="0" :max="($item['item_discount_type'] ?? '') === 'percentage' ? '100' : null" required :error="$errors->first('items.' . $index . '.item_discount_value')" />
-                        </div>
-
-                        <div class="xl:col-span-2 xl:pt-6">
-                            <p class="text-xs text-gray-500 xl:text-right">الإجمالي بعد خصم البند</p>
-                            <p class="text-sm font-medium text-gray-900 xl:text-right">{{ \App\Support\Money::format($this->lineTotalFor($index)) }}</p>
-                            <p class="text-xs text-gray-400 xl:text-right">خصم: {{ \App\Support\Money::format($this->itemDiscountAmountFor($index)) }}</p>
-                        </div>
-
-                        <div class="xl:col-span-1 xl:pt-6 xl:text-right">
-                            <button wire:click="removeItem({{ $index }})"
-                                    type="button"
-                                    class="text-red-600 hover:text-red-800 text-sm font-medium py-2">
-                                حذف
-                            </button>
-                        </div>
-                    </div>
+                    @endif
                 @endforeach
             </div>
 
             <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-gray-200 pt-4">
-                <x-button wire:click="addItem" type="button" variant="secondary" class="w-full sm:w-auto">
-                    <x-icon name="plus" class="h-4 w-4 ml-1.5" />
-                    إضافة منتج
-                </x-button>
+                <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                    <x-button wire:click="addItem" type="button" variant="secondary" class="w-full sm:w-auto">
+                        <x-icon name="plus" class="h-4 w-4 ml-1.5" />
+                        إضافة منتج
+                    </x-button>
+                    <x-button wire:click="addSection" type="button" variant="secondary" class="w-full sm:w-auto">
+                        <x-icon name="plus" class="h-4 w-4 ml-1.5" />
+                        إضافة قسم
+                    </x-button>
+                </div>
 
-                <p class="text-xs text-gray-500">خصم البند يخص العميل ويظهر داخل إجمالي عرض السعر. لا يؤثر عرض السعر على المخزون.</p>
+                <p class="text-xs text-gray-500">يمكن تنظيم البنود داخل أقسام. الأقسام لا تؤثر على الإجمالي، والوصف يظهر في طباعة عرض السعر فقط عند تعبئته.</p>
             </div>
         </x-card>
 

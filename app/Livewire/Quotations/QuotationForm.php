@@ -6,6 +6,7 @@ use App\Enums\QuotationStatus;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Quotation;
+use App\Models\QuotationItem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -56,14 +57,17 @@ class QuotationForm extends Component
             $this->installation_notes = $quotation->installation_notes ?? '';
             $this->status = $quotation->status->value;
             $this->items = $quotation->items->map(fn ($item) => [
-                'product_id' => (string) $item->product_id,
+                'row_type' => $item->row_type ?? QuotationItem::TYPE_PRODUCT,
+                'section_title' => $item->section_title ?? '',
+                'product_id' => $item->product_id ? (string) $item->product_id : '',
+                'description' => $item->description ?? '',
                 'quantity' => (string) $item->quantity,
                 'unit_sale_price' => (string) $item->unit_sale_price,
                 'item_discount_type' => $item->item_discount_type,
                 'item_discount_value' => (string) $item->item_discount_value,
             ])->values()->all();
             $this->productSearch = $quotation->items
-                ->map(fn ($item) => $this->productLabel($item->product))
+                ->map(fn ($item) => $item->product ? $this->productLabel($item->product) : '')
                 ->values()
                 ->all();
 
@@ -96,11 +100,14 @@ class QuotationForm extends Component
             'installation_notes' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in(array_column(QuotationStatus::cases(), 'value'))],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.quantity' => ['required', 'numeric', 'min:0.01', 'max:999999999.99'],
-            'items.*.unit_sale_price' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
-            'items.*.item_discount_type' => ['required', Rule::in(array_keys(Quotation::discountTypes()))],
-            'items.*.item_discount_value' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
+            'items.*.row_type' => ['required', Rule::in([QuotationItem::TYPE_PRODUCT, QuotationItem::TYPE_SECTION])],
+            'items.*.section_title' => ['nullable', 'string', 'max:255'],
+            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.description' => ['nullable', 'string', 'max:2000'],
+            'items.*.quantity' => ['nullable', 'numeric', 'min:0', 'max:999999999.99'],
+            'items.*.unit_sale_price' => ['nullable', 'numeric', 'min:0', 'max:999999999.99'],
+            'items.*.item_discount_type' => ['nullable', Rule::in(array_keys(Quotation::discountTypes()))],
+            'items.*.item_discount_value' => ['nullable', 'numeric', 'min:0', 'max:999999999.99'],
         ];
     }
 
@@ -135,14 +142,12 @@ class QuotationForm extends Component
 
     public function addItem(): void
     {
-        $this->items[] = [
-            'product_id' => '',
-            'quantity' => '1',
-            'unit_sale_price' => '0',
-            'item_discount_type' => Quotation::DISCOUNT_FIXED,
-            'item_discount_value' => '0',
-        ];
-        $this->productSearch[] = '';
+        $this->insertRowAfter(count($this->items) - 1, $this->productRowDefaults());
+    }
+
+    public function addSection(): void
+    {
+        $this->insertRowAfter(count($this->items) - 1, $this->sectionRowDefaults());
     }
 
     public function removeItem(int $index): void
@@ -155,6 +160,24 @@ class QuotationForm extends Component
         if ($this->items === []) {
             $this->addItem();
         }
+    }
+
+    public function moveItemUp(int $index): void
+    {
+        if ($index <= 0 || ! isset($this->items[$index])) {
+            return;
+        }
+
+        $this->swapRows($index, $index - 1);
+    }
+
+    public function moveItemDown(int $index): void
+    {
+        if (! isset($this->items[$index + 1])) {
+            return;
+        }
+
+        $this->swapRows($index, $index + 1);
     }
 
     public function selectCustomer(int $customerId): void
@@ -252,6 +275,9 @@ class QuotationForm extends Component
         }
 
         $data = $this->validate();
+        $this->normalizeRows();
+        $data['items'] = $this->items;
+        $this->ensureValidRows($data['items']);
         $this->ensureValidItemDiscounts($data['items']);
         $this->ensureDistinctProducts();
 
@@ -286,6 +312,24 @@ class QuotationForm extends Component
             $quotation->items()->delete();
 
             foreach ($data['items'] as $index => $item) {
+                if (($item['row_type'] ?? QuotationItem::TYPE_PRODUCT) === QuotationItem::TYPE_SECTION) {
+                    $quotation->items()->create([
+                        'row_type' => QuotationItem::TYPE_SECTION,
+                        'product_id' => null,
+                        'section_title' => $item['section_title'],
+                        'description' => null,
+                        'sort_order' => $index + 1,
+                        'quantity' => 0,
+                        'unit_sale_price' => 0,
+                        'item_discount_type' => Quotation::DISCOUNT_FIXED,
+                        'item_discount_value' => 0,
+                        'item_discount_amount' => 0,
+                        'line_total' => 0,
+                    ]);
+
+                    continue;
+                }
+
                 $quantity = (float) $item['quantity'];
                 $unitSalePrice = (float) $item['unit_sale_price'];
                 $discountValue = (float) $item['item_discount_value'];
@@ -293,7 +337,10 @@ class QuotationForm extends Component
                 $itemDiscountAmount = Quotation::discountAmount($gross, $item['item_discount_type'], $discountValue);
 
                 $quotation->items()->create([
+                    'row_type' => QuotationItem::TYPE_PRODUCT,
                     'product_id' => $item['product_id'],
+                    'section_title' => null,
+                    'description' => $item['description'] ?: null,
                     'sort_order' => $index + 1,
                     'quantity' => $quantity,
                     'unit_sale_price' => $unitSalePrice,
@@ -315,6 +362,10 @@ class QuotationForm extends Component
     {
         $item = $this->items[$index] ?? [];
 
+        if (($item['row_type'] ?? QuotationItem::TYPE_PRODUCT) === QuotationItem::TYPE_SECTION) {
+            return 0.0;
+        }
+
         return Quotation::lineTotal(
             (float) ($item['quantity'] ?? 0),
             (float) ($item['unit_sale_price'] ?? 0),
@@ -326,6 +377,11 @@ class QuotationForm extends Component
     public function itemDiscountAmountFor(int $index): float
     {
         $item = $this->items[$index] ?? [];
+
+        if (($item['row_type'] ?? QuotationItem::TYPE_PRODUCT) === QuotationItem::TYPE_SECTION) {
+            return 0.0;
+        }
+
         $gross = (float) ($item['quantity'] ?? 0) * (float) ($item['unit_sale_price'] ?? 0);
 
         return Quotation::discountAmount(
@@ -337,7 +393,9 @@ class QuotationForm extends Component
 
     public function subtotal(): float
     {
-        return round(collect(array_keys($this->items))->sum(fn (int $index) => $this->lineTotalFor($index)), 2);
+        return round(collect(array_keys($this->items))
+            ->filter(fn (int $index) => ($this->items[$index]['row_type'] ?? QuotationItem::TYPE_PRODUCT) === QuotationItem::TYPE_PRODUCT)
+            ->sum(fn (int $index) => $this->lineTotalFor($index)), 2);
     }
 
     public function invoiceDiscountAmount(): float
@@ -369,6 +427,10 @@ class QuotationForm extends Component
     private function ensureValidItemDiscounts(array $items): void
     {
         foreach ($items as $index => $item) {
+            if (($item['row_type'] ?? QuotationItem::TYPE_PRODUCT) === QuotationItem::TYPE_SECTION) {
+                continue;
+            }
+
             if ($item['item_discount_type'] === Quotation::DISCOUNT_PERCENTAGE && (float) $item['item_discount_value'] > 100) {
                 throw ValidationException::withMessages([
                     'items.' . $index . '.item_discount_value' => 'خصم النسبة لا يمكن أن يتجاوز 100%.',
@@ -379,7 +441,11 @@ class QuotationForm extends Component
 
     private function ensureDistinctProducts(): void
     {
-        $productIds = collect($this->items)->pluck('product_id')->filter()->values();
+        $productIds = collect($this->items)
+            ->filter(fn (array $item) => ($item['row_type'] ?? QuotationItem::TYPE_PRODUCT) === QuotationItem::TYPE_PRODUCT)
+            ->pluck('product_id')
+            ->filter()
+            ->values();
 
         if ($productIds->count() !== $productIds->unique()->count()) {
             throw ValidationException::withMessages([
@@ -445,6 +511,10 @@ class QuotationForm extends Component
 
     public function productOptionsFor(int $index)
     {
+        if (($this->items[$index]['row_type'] ?? QuotationItem::TYPE_PRODUCT) !== QuotationItem::TYPE_PRODUCT) {
+            return collect();
+        }
+
         $term = trim($this->productSearch[$index] ?? '');
 
         return Product::query()
@@ -469,5 +539,130 @@ class QuotationForm extends Component
     private function productLabel(Product $product): string
     {
         return trim($product->name.' ('.$product->internal_sku.')');
+    }
+
+    private function ensureValidRows(array $items): void
+    {
+        $hasProductRows = false;
+
+        foreach ($items as $index => $item) {
+            $rowType = $item['row_type'] ?? QuotationItem::TYPE_PRODUCT;
+
+            if ($rowType === QuotationItem::TYPE_SECTION) {
+                if (! filled(trim((string) ($item['section_title'] ?? '')))) {
+                    throw ValidationException::withMessages([
+                        'items.' . $index . '.section_title' => 'اسم القسم مطلوب.',
+                    ]);
+                }
+
+                continue;
+            }
+
+            $hasProductRows = true;
+
+            if (! filled($item['product_id'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'items.' . $index . '.product_id' => 'اختر منتجًا لهذا البند.',
+                ]);
+            }
+
+            if ((float) ($item['quantity'] ?? 0) < 0.01) {
+                throw ValidationException::withMessages([
+                    'items.' . $index . '.quantity' => 'الكمية يجب أن تكون أكبر من صفر.',
+                ]);
+            }
+
+            if (($item['item_discount_type'] ?? null) === null) {
+                throw ValidationException::withMessages([
+                    'items.' . $index . '.item_discount_type' => 'حدد نوع خصم البند.',
+                ]);
+            }
+        }
+
+        if (! $hasProductRows) {
+            throw ValidationException::withMessages([
+                'items' => 'أضف بند منتج واحدًا على الأقل داخل عرض السعر.',
+            ]);
+        }
+    }
+
+    private function productRowDefaults(): array
+    {
+        return [
+            'row_type' => QuotationItem::TYPE_PRODUCT,
+            'section_title' => '',
+            'product_id' => '',
+            'description' => '',
+            'quantity' => '1',
+            'unit_sale_price' => '0',
+            'item_discount_type' => Quotation::DISCOUNT_FIXED,
+            'item_discount_value' => '0',
+        ];
+    }
+
+    private function sectionRowDefaults(): array
+    {
+        return [
+            'row_type' => QuotationItem::TYPE_SECTION,
+            'section_title' => '',
+            'product_id' => '',
+            'description' => '',
+            'quantity' => '0',
+            'unit_sale_price' => '0',
+            'item_discount_type' => Quotation::DISCOUNT_FIXED,
+            'item_discount_value' => '0',
+        ];
+    }
+
+    private function insertRowAfter(int $index, array $row): void
+    {
+        $position = max(0, $index + 1);
+
+        array_splice($this->items, $position, 0, [$row]);
+        array_splice($this->productSearch, $position, 0, ['']);
+    }
+
+    private function swapRows(int $from, int $to): void
+    {
+        [$this->items[$from], $this->items[$to]] = [$this->items[$to], $this->items[$from]];
+        [$this->productSearch[$from], $this->productSearch[$to]] = [$this->productSearch[$to], $this->productSearch[$from]];
+        $this->items = array_values($this->items);
+        $this->productSearch = array_values($this->productSearch);
+    }
+
+    private function normalizeRows(): void
+    {
+        $this->items = collect($this->items)->map(function (array $item) {
+            $rowType = $item['row_type'] ?? QuotationItem::TYPE_PRODUCT;
+
+            if ($rowType === QuotationItem::TYPE_SECTION) {
+                return [
+                    'row_type' => QuotationItem::TYPE_SECTION,
+                    'section_title' => trim((string) ($item['section_title'] ?? '')),
+                    'product_id' => '',
+                    'description' => '',
+                    'quantity' => '0',
+                    'unit_sale_price' => '0',
+                    'item_discount_type' => Quotation::DISCOUNT_FIXED,
+                    'item_discount_value' => '0',
+                ];
+            }
+
+            return [
+                'row_type' => QuotationItem::TYPE_PRODUCT,
+                'section_title' => '',
+                'product_id' => (string) ($item['product_id'] ?? ''),
+                'description' => trim((string) ($item['description'] ?? '')),
+                'quantity' => (string) ($item['quantity'] ?? '1'),
+                'unit_sale_price' => (string) ($item['unit_sale_price'] ?? '0'),
+                'item_discount_type' => $item['item_discount_type'] ?? Quotation::DISCOUNT_FIXED,
+                'item_discount_value' => (string) ($item['item_discount_value'] ?? '0'),
+            ];
+        })->values()->all();
+
+        $this->productSearch = collect($this->items)
+            ->map(fn (array $item, int $index) => $item['row_type'] === QuotationItem::TYPE_PRODUCT ? ($this->productSearch[$index] ?? '') : '')
+            ->values()
+            ->all();
     }
 }
