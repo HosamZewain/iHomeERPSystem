@@ -592,6 +592,39 @@ class SalesInvoiceTest extends TestCase
             ->assertDontSee('Beta Invoice Product');
     }
 
+    public function test_sales_invoice_can_save_repeated_product_rows_when_needed(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::factory()->create();
+        $product = Product::factory()->create([
+            'name' => 'Repeated Product',
+            'sale_price' => 250,
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SalesInvoiceCreate::class)
+            ->set('invoice_number', 'INV-REPEAT-001')
+            ->set('customer_id', (string) $customer->id)
+            ->set('invoice_date', '2026-05-12')
+            ->set('items.0.product_id', (string) $product->id)
+            ->set('items.0.quantity', '1')
+            ->set('items.0.unit_sale_price', '250')
+            ->call('addItem')
+            ->set('items.1.product_id', (string) $product->id)
+            ->set('items.1.quantity', '2')
+            ->set('items.1.unit_sale_price', '250')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $invoice = SalesInvoice::query()->with('items')->where('invoice_number', 'INV-REPEAT-001')->firstOrFail();
+
+        $this->assertCount(2, $invoice->items);
+        $this->assertSame([$product->id, $product->id], $invoice->items->pluck('product_id')->all());
+        $this->assertEquals(750.0, (float) $invoice->subtotal);
+        $this->assertEquals(750.0, (float) $invoice->gross_total);
+    }
+
     public function test_sales_invoice_form_can_create_customer_inline_and_select_it(): void
     {
         $user = User::factory()->create(['role' => 'admin']);

@@ -478,6 +478,10 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
   - specific to that quotation row
   - shown on quotation show/print when present
   - not copied to sales invoice rows
+- Repeated products are valid in quotations and must not be blocked:
+  - the same product can appear in more than one section
+  - the same product can repeat intentionally as separate rows
+  - quotation validation should reject only invalid rows, not repeated product usage
 - Quotation-to-sales-invoice conversion is implemented via `Quotation::convertToSalesInvoice()`.
 - Conversion creates a draft sales invoice, copies customer, product rows only, prices, item discounts, invoice discount, notes, and installation fields, then marks quotation converted.
 - Section rows are ignored during quotation-to-invoice conversion.
@@ -500,6 +504,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Draft sales invoices do not affect stock and can be edited.
 - Confirmed sales invoices reduce stock and create stock movement records.
 - Sales invoice items use persisted `sort_order` so manual item entry order is preserved across save, edit, show, and print.
+- Sales invoice data now permits repeated product rows when needed for compatibility with quotation conversion from grouped/repeated quotation rows.
 - Confirmation requires sufficient stock.
 - `cost_at_sale_time` is frozen on confirmation using the product current average cost.
 - Confirmed sales invoice editing is blocked.
@@ -643,6 +648,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Quotation section rows are structural only and never affect totals or stock.
 - Only quotation product rows affect quotation pricing, discounts, and total.
 - Quotation-only item descriptions do not affect pricing and do not flow into sales invoice items.
+- Quotation totals are row-based, not unique-product-based.
 - Item-level discounts apply to product rows.
 - Invoice-level discounts apply to product totals only.
 - Installation is separate from products and does not affect stock.

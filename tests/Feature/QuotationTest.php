@@ -489,4 +489,65 @@ class QuotationTest extends TestCase
         $this->assertEquals(1200.0, (float) $quotation->subtotal);
         $this->assertEquals(1200.0, (float) $quotation->total);
     }
+
+    public function test_quotation_allows_repeated_products_across_sections_and_converts_rows_safely(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::factory()->create();
+        $product = Product::factory()->create([
+            'name' => 'Repeated Sensor',
+            'internal_sku' => 'REP-1',
+            'sale_price' => 250,
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(QuotationForm::class)
+            ->set('quotation_number', 'QUO-REPEAT-001')
+            ->set('customer_id', (string) $customer->id)
+            ->set('quotation_date', '2026-05-12')
+            ->call('addSection')
+            ->set('items.1.section_title', 'غرفة النوم')
+            ->call('moveItemUp', 1)
+            ->set('items.1.product_id', (string) $product->id)
+            ->set('items.1.quantity', '1')
+            ->set('items.1.unit_sale_price', '250')
+            ->call('addSection')
+            ->set('items.2.section_title', 'الريسيبشن')
+            ->call('addItem')
+            ->set('items.3.product_id', (string) $product->id)
+            ->set('items.3.quantity', '2')
+            ->set('items.3.unit_sale_price', '250')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $quotation = Quotation::query()->with('items.product')->where('quotation_number', 'QUO-REPEAT-001')->firstOrFail();
+
+        $this->assertCount(4, $quotation->items);
+        $this->assertSame(
+            [
+                QuotationItem::TYPE_SECTION,
+                QuotationItem::TYPE_PRODUCT,
+                QuotationItem::TYPE_SECTION,
+                QuotationItem::TYPE_PRODUCT,
+            ],
+            $quotation->items->pluck('row_type')->all()
+        );
+        $this->assertSame([$product->id, $product->id], $quotation->items->where('row_type', QuotationItem::TYPE_PRODUCT)->pluck('product_id')->values()->all());
+        $this->assertEquals(750.0, (float) $quotation->subtotal);
+        $this->assertEquals(750.0, (float) $quotation->total);
+
+        $this->actingAs($user)
+            ->get(route('quotations.print', $quotation))
+            ->assertOk()
+            ->assertSeeInOrder(['غرفة النوم', 'Repeated Sensor', 'الريسيبشن', 'Repeated Sensor']);
+
+        $invoice = $quotation->convertToSalesInvoice($user)->load('items');
+
+        $this->assertCount(2, $invoice->items);
+        $this->assertSame([$product->id, $product->id], $invoice->items->pluck('product_id')->all());
+        $this->assertSame([1, 2], $invoice->items->pluck('sort_order')->all());
+        $this->assertEquals(750.0, (float) $invoice->subtotal);
+        $this->assertEquals(750.0, (float) $invoice->gross_total);
+    }
 }

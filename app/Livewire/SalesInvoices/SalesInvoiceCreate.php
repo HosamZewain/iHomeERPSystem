@@ -304,7 +304,6 @@ class SalesInvoiceCreate extends Component
 
         $data = $this->validate();
         $this->ensureValidItemDiscounts($data['items']);
-        $this->ensureDistinctProducts();
 
         if ($confirm) {
             $this->ensureSufficientStock($data['items']);
@@ -501,17 +500,6 @@ class SalesInvoiceCreate extends Component
                     'items.' . $index . '.item_discount_value' => 'خصم النسبة لا يمكن أن يتجاوز 100%.',
                 ]);
             }
-        }
-    }
-
-    private function ensureDistinctProducts(): void
-    {
-        $productIds = collect($this->items)->pluck('product_id')->filter()->values();
-
-        if ($productIds->count() !== $productIds->unique()->count()) {
-            throw ValidationException::withMessages([
-                'items' => 'استخدم كل منتج مرة واحدة في فاتورة البيع. زِد الكمية في السطر الموجود بدلًا من تكرار المنتج.',
-            ]);
         }
     }
 

@@ -282,7 +282,6 @@ class QuotationForm extends Component
         $data['items'] = $this->items;
         $this->ensureValidRows($data['items']);
         $this->ensureValidItemDiscounts($data['items']);
-        $this->ensureDistinctProducts();
 
         $quotation = DB::transaction(function () use ($data) {
             $subtotal = $this->subtotal();
@@ -439,21 +438,6 @@ class QuotationForm extends Component
                     'items.' . $index . '.item_discount_value' => 'خصم النسبة لا يمكن أن يتجاوز 100%.',
                 ]);
             }
-        }
-    }
-
-    private function ensureDistinctProducts(): void
-    {
-        $productIds = collect($this->items)
-            ->filter(fn (array $item) => ($item['row_type'] ?? QuotationItem::TYPE_PRODUCT) === QuotationItem::TYPE_PRODUCT)
-            ->pluck('product_id')
-            ->filter()
-            ->values();
-
-        if ($productIds->count() !== $productIds->unique()->count()) {
-            throw ValidationException::withMessages([
-                'items' => 'استخدم كل منتج مرة واحدة في عرض السعر. زِد الكمية في السطر الموجود بدلًا من تكرار المنتج.',
-            ]);
         }
     }
 

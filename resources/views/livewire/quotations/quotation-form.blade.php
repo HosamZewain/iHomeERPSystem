@@ -11,6 +11,13 @@
         <x-alert type="error" :message="$errors->first('items')" />
     @endif
 
+    @php
+        $firstRowErrorKey = collect($errors->keys())->first(fn ($key) => str_starts_with($key, 'items.'));
+    @endphp
+    @if($firstRowErrorKey)
+        <x-alert type="error" :message="$errors->first($firstRowErrorKey)" />
+    @endif
+
     @if(! $hasActiveProducts)
         <x-alert type="warning" message="أضف منتجًا نشطًا واحدًا على الأقل قبل إنشاء عرض سعر." />
     @endif
