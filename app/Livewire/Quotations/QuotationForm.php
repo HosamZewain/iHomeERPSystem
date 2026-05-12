@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\QuotationItem;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -57,6 +58,7 @@ class QuotationForm extends Component
             $this->installation_notes = $quotation->installation_notes ?? '';
             $this->status = $quotation->status->value;
             $this->items = $quotation->items->map(fn ($item) => [
+                'row_key' => 'quotation-item-'.$item->id,
                 'row_type' => $item->row_type ?? QuotationItem::TYPE_PRODUCT,
                 'section_title' => $item->section_title ?? '',
                 'product_id' => $item->product_id ? (string) $item->product_id : '',
@@ -100,6 +102,7 @@ class QuotationForm extends Component
             'installation_notes' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in(array_column(QuotationStatus::cases(), 'value'))],
             'items' => ['required', 'array', 'min:1'],
+            'items.*.row_key' => ['nullable', 'string', 'max:100'],
             'items.*.row_type' => ['required', Rule::in([QuotationItem::TYPE_PRODUCT, QuotationItem::TYPE_SECTION])],
             'items.*.section_title' => ['nullable', 'string', 'max:255'],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
@@ -589,6 +592,7 @@ class QuotationForm extends Component
     private function productRowDefaults(): array
     {
         return [
+            'row_key' => $this->newRowKey(),
             'row_type' => QuotationItem::TYPE_PRODUCT,
             'section_title' => '',
             'product_id' => '',
@@ -603,6 +607,7 @@ class QuotationForm extends Component
     private function sectionRowDefaults(): array
     {
         return [
+            'row_key' => $this->newRowKey(),
             'row_type' => QuotationItem::TYPE_SECTION,
             'section_title' => '',
             'product_id' => '',
@@ -637,6 +642,7 @@ class QuotationForm extends Component
 
             if ($rowType === QuotationItem::TYPE_SECTION) {
                 return [
+                    'row_key' => (string) ($item['row_key'] ?? $this->newRowKey()),
                     'row_type' => QuotationItem::TYPE_SECTION,
                     'section_title' => trim((string) ($item['section_title'] ?? '')),
                     'product_id' => '',
@@ -649,6 +655,7 @@ class QuotationForm extends Component
             }
 
             return [
+                'row_key' => (string) ($item['row_key'] ?? $this->newRowKey()),
                 'row_type' => QuotationItem::TYPE_PRODUCT,
                 'section_title' => '',
                 'product_id' => (string) ($item['product_id'] ?? ''),
@@ -664,5 +671,10 @@ class QuotationForm extends Component
             ->map(fn (array $item, int $index) => $item['row_type'] === QuotationItem::TYPE_PRODUCT ? ($this->productSearch[$index] ?? '') : '')
             ->values()
             ->all();
+    }
+
+    private function newRowKey(): string
+    {
+        return 'quotation-row-'.Str::uuid()->toString();
     }
 }

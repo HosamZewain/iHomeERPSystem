@@ -108,7 +108,8 @@
             <div class="space-y-3">
                 @foreach($items as $index => $item)
                     @if(($item['row_type'] ?? \App\Models\QuotationItem::TYPE_PRODUCT) === \App\Models\QuotationItem::TYPE_SECTION)
-                        <div class="rounded-lg border border-primary-200 bg-primary-50/50 p-4">
+                        <div wire:key="{{ $item['row_key'] ?? 'quotation-row-'.$index }}" class="rounded-lg border border-primary-200 bg-primary-50/50 p-4">
+                            <input type="hidden" wire:model="items.{{ $index }}.row_key">
                             <input type="hidden" wire:model="items.{{ $index }}.row_type">
                             <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                 <div class="flex-1">
@@ -124,7 +125,8 @@
                             <p class="mt-3 text-xs text-primary-900/80">القسم ينظم عرض السعر فقط ولا يؤثر على الكمية أو السعر أو الإجمالي.</p>
                         </div>
                     @else
-                        <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <div wire:key="{{ $item['row_key'] ?? 'quotation-row-'.$index }}" class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                            <input type="hidden" wire:model="items.{{ $index }}.row_key">
                             <input type="hidden" wire:model="items.{{ $index }}.row_type">
 
                             <div class="mb-3 flex flex-wrap items-center justify-between gap-2">

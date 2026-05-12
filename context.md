@@ -486,6 +486,7 @@ cd /home/u470070883/domains/erp.ihome-store.com/app
 - Quotation form has searchable customer/product selection integrated into the same selector UI.
 - Quotation form supports creating a new customer inline without leaving the screen.
 - Quotation form supports adding named section rows, moving rows up/down, and saving optional per-product quotation descriptions.
+- Quotation form dynamic rows now carry stable client-side row keys so large quotations with many items remain saveable/editable in Livewire without row-state drift.
 - Quotation create/edit cards that contain searchable dropdowns use visible card overflow so result lists are not clipped inside the card container.
 
 ### Sales Invoices

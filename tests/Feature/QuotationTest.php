@@ -456,4 +456,37 @@ class QuotationTest extends TestCase
         $this->assertSame([$productA->id, $productB->id], $invoice->items->pluck('product_id')->all());
         $this->assertSame([1, 2], $invoice->items->pluck('sort_order')->all());
     }
+
+    public function test_quotation_can_save_with_more_than_ten_product_rows(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::factory()->create();
+        $products = Product::factory()->count(12)->create(['is_active' => true, 'sale_price' => 100]);
+
+        $component = Livewire::actingAs($user)
+            ->test(QuotationForm::class)
+            ->set('quotation_number', 'QUO-BULK-012')
+            ->set('customer_id', (string) $customer->id)
+            ->set('quotation_date', '2026-05-12');
+
+        foreach ($products as $index => $product) {
+            if ($index > 0) {
+                $component->call('addItem');
+            }
+
+            $component
+                ->set("items.{$index}.product_id", (string) $product->id)
+                ->set("items.{$index}.quantity", '1')
+                ->set("items.{$index}.unit_sale_price", '100');
+        }
+
+        $component->call('save')->assertHasNoErrors();
+
+        $quotation = Quotation::query()->with('items')->where('quotation_number', 'QUO-BULK-012')->firstOrFail();
+
+        $this->assertCount(12, $quotation->items);
+        $this->assertSame(range(1, 12), $quotation->items->pluck('sort_order')->all());
+        $this->assertEquals(1200.0, (float) $quotation->subtotal);
+        $this->assertEquals(1200.0, (float) $quotation->total);
+    }
 }
